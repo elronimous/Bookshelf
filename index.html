@@ -1881,6 +1881,8 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
         settings.ui.mokuroFolderLinked = true;
         settings.ui.mokuroFolderName = dirHandle.name || "";
         saveSettings();
+        // After linking, remap existing Mokuro items to use local folder files when possible
+        try{ await refreshLibraryToUseLinkedMokuroFolder(dirHandle); }catch(e){}
         return dirHandle;
       }catch(err){
         // user may have cancelled
@@ -1911,6 +1913,156 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
         return null;
       }
     }
+
+    // --- Mokuro folder linking: map existing library items to local folder files ---
+    function decodeMaybe(str){
+      try{ return decodeURIComponent(str); }catch{ return str; }
+    }
+
+    function normaliseSlashes(p){ return String(p||"").replace(/\\/g, "/").replace(/\/+/g, "/"); }
+
+    function extractMokuroRelPathFromUrl(urlOrPath, rootName){
+      const raw = String(urlOrPath || "").trim();
+      if (!raw) return null;
+      const decoded = decodeMaybe(raw);
+      const norm = normaliseSlashes(decoded);
+
+      // Try to find the chosen root folder name in the path
+      const rn = rootName ? String(rootName).trim() : "";
+      if (rn){
+        const idx = norm.toLowerCase().lastIndexOf("/" + rn.toLowerCase() + "/");
+        if (idx >= 0){
+          return norm.slice(idx + rn.length + 2); // skip "/<rootName>/"
+        }
+        // Sometimes it's encoded or appears as "W:/<rootName>/..."
+        const idx2 = norm.toLowerCase().lastIndexOf(rn.toLowerCase() + "/");
+        if (idx2 >= 0){
+          const after = norm.slice(idx2 + rn.length + 1);
+          if (after && after.includes(".html")) return after;
+        }
+      }
+
+      // Fallback: common "Mokuro Bookshelf" patterns
+      const mkNames = ["Mokuro Bookshelf", "Mokuro%20Bookshelf"];
+      for (const n of mkNames){
+        const nd = decodeMaybe(n);
+        const j = norm.toLowerCase().lastIndexOf("/" + nd.toLowerCase() + "/");
+        if (j >= 0){
+          return norm.slice(j + nd.length + 2);
+        }
+      }
+
+      // If it's already a relative-looking path, accept it
+      if (!/^[a-zA-Z]:\//.test(norm) && !/^https?:\/\//i.test(norm) && norm.endsWith(".html")){
+        return norm.replace(/^\//, "");
+      }
+
+      return null;
+    }
+
+    async function walkDirForHtml(dirHandle, prefix){
+      const out = [];
+      prefix = prefix || "";
+      try{
+        for await (const [name, handle] of dirHandle.entries()){
+          if (handle.kind === "file"){
+            if (String(name).toLowerCase().endsWith(".html")){
+              out.push(prefix + name);
+            }
+          } else if (handle.kind === "directory"){
+            out.push(...await walkDirForHtml(handle, prefix + name + "/"));
+          }
+        }
+      }catch(e){
+        // ignore
+      }
+      return out;
+    }
+
+    async function getFileHandleByRelPath(rootDirHandle, relPath){
+      const parts = normaliseSlashes(relPath).split("/").filter(Boolean);
+      if (!parts.length) return null;
+      let cur = rootDirHandle;
+      for (let i=0; i<parts.length; i++){
+        const part = parts[i];
+        const isLast = (i === parts.length-1);
+        if (isLast){
+          return await cur.getFileHandle(part);
+        } else {
+          cur = await cur.getDirectoryHandle(part);
+        }
+      }
+      return null;
+    }
+
+    async function openMokuroFromLinkedFolder(relPath){
+      const root = await getLinkedMokuroFolder();
+      if (!root){
+        alert("Mokuro folder isn't linked yet (or permission wasn't granted). Use Settings → Link your Mokuro folder.");
+        return;
+      }
+      const ok = await ensureHandlePermission(root);
+      if (!ok){
+        alert("Permission to read the Mokuro folder wasn't granted.");
+        return;
+      }
+      try{
+        const fh = await getFileHandleByRelPath(root, relPath);
+        if (!fh){
+          alert("Couldn't find that file in your linked Mokuro folder.");
+          return;
+        }
+        const file = await fh.getFile();
+        const url = URL.createObjectURL(file);
+        const w = window.open(url, "_blank", "noopener,noreferrer");
+        if (!w) location.href = url;
+        setTimeout(() => { try{ URL.revokeObjectURL(url); }catch(e){} }, 60_000);
+      }catch(err){
+        console.error(err);
+        alert("Couldn't open that Mokuro file from the linked folder. See console for details.");
+      }
+    }
+
+    async function refreshLibraryToUseLinkedMokuroFolder(dirHandle){
+      try{
+        const rootName = (settings.ui && settings.ui.mokuroFolderName) ? settings.ui.mokuroFolderName : (dirHandle && dirHandle.name ? dirHandle.name : "");
+        // Build an index of HTML files under the linked folder
+        const htmlList = await walkDirForHtml(dirHandle, "");
+        const set = new Set(htmlList.map(p => normaliseSlashes(p)));
+
+        let changed = false;
+
+        for (const link of (settings.links || [])){
+          if (!link) continue;
+          if (link.openType === "local") continue; // local file tile (IndexedDB)
+          // Only remap things that look like mokuro HTMLs
+          const u = String(link.url || "");
+          const rel = extractMokuroRelPathFromUrl(u, rootName);
+          if (!rel) continue;
+
+          const relNorm = normaliseSlashes(rel);
+          if (set.has(relNorm)){
+            if (link.openType !== "mokurofs" || link.mokuroRelPath !== relNorm){
+              link.openType = "mokurofs";
+              link.mokuroRelPath = relNorm;
+              link.mokuroUrlFallback = link.mokuroUrlFallback || link.url || "";
+              changed = true;
+            }
+          }
+        }
+
+        if (changed){
+          saveSettings();
+        }
+        // Always re-render because the open behavior/tooltips may change
+        try{ route(); }catch(e){ try{ renderHome(); }catch(_e){} }
+        return { changed, totalHtml: htmlList.length };
+      }catch(err){
+        console.error(err);
+        return { changed: false, totalHtml: 0, error: true };
+      }
+    }
+
 
 async function openLocalFileById(fileId){
       if (!fileId) return;
@@ -2348,6 +2500,11 @@ const openA = card.querySelector('[data-action="open"]');
           m.starred = !(m.starred === true);
           saveSettings();
           refreshBooks();
+
+      // If a Mokuro folder was previously linked, ensure library items prefer local folder versions when possible
+      if (settings.ui && settings.ui.mokuroFolderLinked){
+        getLinkedMokuroFolder().then((h) => { if (h) refreshLibraryToUseLinkedMokuroFolder(h); }).catch(() => {});
+      }
           route();
         });
       }
@@ -2448,7 +2605,7 @@ const openA = card.querySelector('[data-action="open"]');
       const fill = card.querySelector(".progress-fill");
       fill.style.width = `${link.percentComplete}%`;
 
-      const provider = (link.openType === "local") ? "Local file" : linkProviderLabel(link.url);
+      const provider = (link.openType === "local") ? "Local file" : (link.openType === "mokurofs" ? "Mokuro folder" : linkProviderLabel(link.url));
       const pctText = `${Math.round(link.percentComplete)}%`;
 
       const pctEl = card.querySelector(".pct-toggle");
@@ -2474,6 +2631,16 @@ const openA = card.querySelector('[data-action="open"]');
           e.preventDefault();
           e.stopPropagation();
           openLocalFileById(link.localFileId);
+        });
+      } else if (link.openType === "mokurofs" && link.mokuroRelPath){
+        openA.href = "#";
+        openA.removeAttribute("target");
+        openA.removeAttribute("rel");
+        openA.setAttribute("aria-label", "Open Mokuro file");
+        openA.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openMokuroFromLinkedFolder(link.mokuroRelPath);
         });
       } else {
         openA.href = normaliseUrl(link.url || "");
