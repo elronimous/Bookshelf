@@ -812,20 +812,41 @@
     }
 
     
-    .book-meta{
-      position:absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 3;
-      pointer-events: none;
+    
+.book-meta{
+  position:absolute;
+  left: 10px;
+  right: 10px;
+  bottom: calc(10px + var(--progH) + 8px);
+  z-index: 4;
+  pointer-events: none;
 
-      /* tighter + cleaner (no blurred/gradient panel) */
-      padding: 6px 10px 0;
-      background: none;
-      backdrop-filter: none;
-      -webkit-backdrop-filter: none;
-    }
+  display:flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+
+  /* tiny breathing room so text doesn't hug the edge */
+  padding: 0 2px;
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Actions panel sits above title when revealed */
+.book-meta .tile-actions{
+  align-self: flex-end;
+  position: relative;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  pointer-events: auto;
+  display:flex;
+  flex-direction: column;
+  align-items:flex-end;
+  gap: 8px;
+  margin-bottom: 6px;
+}
 
     .book-meta .book-title{
       font-weight: 900;
@@ -929,17 +950,10 @@
       background: rgba(255,255,255,.14);
       transform: translateY(-1px);
     }
-    /* Tile actions (toggle + panel) */
+    
+/* Tile actions (panel is placed inside .book-meta) */
 .tile-actions{
-  position:absolute;
-  right: 10px;
-  bottom: 30px; /* sits just above the progress bar overlay */
-  z-index: 4;
-  pointer-events: auto;
   display:flex;
-  flex-direction: column;
-  align-items:flex-end;
-  gap: 8px;
 }
 
 .tile-actions-panel{
@@ -1474,13 +1488,6 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
         <img alt="Cover" />
         <div class="book-overlay"></div>
 
-        <div class="tile-actions" aria-label="Tile actions">
-<div class="tile-actions-panel" aria-label="Actions panel">
-            <div class="tag-hover" aria-label="Tags">
-              <button class="tag-icon" type="button" title="Tags">🏷️</button>
-              <div class="tag-pop"></div>
-            </div>
-
             <button class="star-btn" type="button" data-action="star" title="Star">☆</button>
 
             <div class="book-actions">
@@ -1493,6 +1500,13 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
         <a class="book-open" data-action="open" href="#" style="position:absolute; inset:0; z-index:1;" aria-label="Open book"></a>
 
         <div class="book-meta">
+        <div class="tile-actions" aria-label="Tile actions">
+<div class="tile-actions-panel" aria-label="Actions panel">
+            <div class="tag-hover" aria-label="Tags">
+              <button class="tag-icon" type="button" title="Tags">🏷️</button>
+              <div class="tag-pop"></div>
+            </div>
+
           <div class="book-title"></div>
           <div class="book-sub"></div>
           <div class="book-sub2" style="display:none;"></div>
@@ -1809,7 +1823,7 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
       try{
         const rec = await idbGetLocalFile(fileId);
         if (!rec || !rec.blob){
-          alert("That local file isn't available in this browser anymore. If you imported settings on a new device, you'll need to re-add the file.");
+          alert("That local file isn't available in this browser. If you moved devices, import a full export that includes local files, or re-add the file.");
           return;
         }
         const blob = rec.blob;
@@ -2132,6 +2146,43 @@ function visibleBooks(){
     }
 
 
+
+function wireActionsToggle(card){
+  const actionsToggle = card.querySelector(".pct-toggle");
+  if (!actionsToggle) return;
+
+  actionsToggle.addEventListener("pointerup", (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    card.classList.toggle("actions-open");
+  }, { passive:false });
+
+  // Close when leaving the tile to keep the UI tidy
+  card.addEventListener("mouseleave", ()=> card.classList.remove("actions-open"));
+}
+
+
+function getSeriesTotal(seriesName){
+  if (!seriesName) return 1;
+  try{
+    const list = Array.isArray(books) ? books : [];
+    const total = list.filter(b => b && b.series === seriesName).length;
+    return (total && total > 0) ? total : 1;
+  }catch(e){
+    return 1;
+  }
+}
+
+function seriesLineForItem(item){
+  const series = (item && typeof item.series === "string") ? item.series.trim() : "";
+  if (series){
+    const total = getSeriesTotal(series);
+    const n = (typeof item.seriesNumber === "number" && Number.isFinite(item.seriesNumber)) ? item.seriesNumber : 1;
+    return `Book ${n}/${total}`;
+  }
+  return "Book 1/1";
+}
+
     // ----------------------------
     // Render: book card
     // ----------------------------
@@ -2170,7 +2221,7 @@ function visibleBooks(){
 
             const sub = card.querySelector(".book-sub");
       sub.style.display = "";
-      sub.textContent = "Book 1/1";
+      sub.textContent = seriesLineForItem(book);
 
       const sub2 = card.querySelector(".book-sub2");
       if (sub2){ sub2.style.display = "none"; sub2.textContent = ""; }
@@ -2206,19 +2257,8 @@ const openA = card.querySelector('[data-action="open"]');
           route();
         });
       }
-
       // Actions toggle (reveal/hide the icon strip)
-      const actionsToggle = card.querySelector(".pct-toggle");
-      if (actionsToggle){
-        actionsToggle.addEventListener("pointerup", (e)=>{
-          e.preventDefault();
-          e.stopPropagation();
-          card.classList.toggle("actions-open");
-        }, { passive:false });
-
-        // Close the strip when you move off the tile (keeps the UI neat)
-        card.addEventListener("mouseleave", ()=> card.classList.remove("actions-open"));
-      }
+      wireActionsToggle(card);
 
 
       // Stop the overlay link from eating button clicks
@@ -2304,8 +2344,8 @@ const openA = card.querySelector('[data-action="open"]');
 
       // Sub rows: keep consistent with normal books (series line only)
       const sub = card.querySelector(".book-sub");
-      sub.style.display = "none";
-      sub.textContent = "";
+      sub.style.display = "";
+      sub.textContent = seriesLineForItem(link);
 
       const sub2 = card.querySelector(".book-sub2");
       if (sub2){ sub2.style.display = "none"; sub2.textContent = ""; }
@@ -2436,6 +2476,10 @@ const openA = card.querySelector('[data-action="open"]');
           });
         }
       }
+
+
+      // Actions toggle (reveal/hide the icon strip)
+      wireActionsToggle(card);
 
       return card;
     }
@@ -2663,17 +2707,7 @@ function createSeriesGroupCard(seriesName, seriesBooks, opts={}){
   });
 
   // Actions toggle (reveal/hide the icon strip)
-      const actionsToggle = card.querySelector(".pct-toggle");
-      if (actionsToggle){
-        actionsToggle.addEventListener("pointerup", (e)=>{
-          e.preventDefault();
-          e.stopPropagation();
-          card.classList.toggle("actions-open");
-        }, { passive:false });
-
-        // Close the strip when you move off the tile (keeps the UI neat)
-        card.addEventListener("mouseleave", ()=> card.classList.remove("actions-open"));
-      }
+  wireActionsToggle(card);
 
   return card;
 }
@@ -2934,7 +2968,7 @@ function renderStatusGrids(bookList, refs){
     });
 
     // ----------------------------
-    // Import / Export
+    // Import / Export (FULL DATA)
     // ----------------------------
     function downloadJSON(filename, data){
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -2948,47 +2982,176 @@ function renderStatusGrids(bookList, refs){
       URL.revokeObjectURL(url);
     }
 
-    function exportSiteSettings(){
-      const payload = {
-        version: 3,
-        exportedAt: new Date().toISOString(),
-        settings: settings
-      };
-      downloadJSON(`bookshelf-settings-${new Date().toISOString().slice(0,10)}.json`, payload);
+    // --- Mokuro localStorage export/import ---
+    function exportMokuroLocalStorage(){
+      const out = {};
+      for (const k of Object.keys(localStorage)){
+        if (!k.startsWith(STORAGE_PREFIX)) continue;
+        out[k] = localStorage.getItem(k);
+      }
+      return out;
     }
 
-    function importSiteSettingsFromFile(file){
-      const reader = new FileReader();
-      reader.onload = () => {
-        const payload = safeJSONParse(reader.result, null);
-        if (!payload || typeof payload !== "object"){
-          alert("That file doesn't look like JSON.");
-          return;
+    function importMokuroLocalStorage(obj){
+      if (!obj || typeof obj !== "object") return;
+      for (const [k, v] of Object.entries(obj)){
+        if (!k.startsWith(STORAGE_PREFIX)) continue;
+        if (typeof v === "string"){
+          localStorage.setItem(k, v);
         }
-        const incoming = payload.settings || payload; // allow raw settings too
-        if (!incoming || typeof incoming !== "object" || !(incoming.version===2 || incoming.version===3)){
-          alert("Unsupported settings file. Expected version 2 or 3.");
-          return;
+      }
+    }
+
+    // --- IndexedDB local file export/import ---
+    async function idbGetAllLocalFiles(){
+      const db = await openFileDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(["files"], "readonly");
+        const store = tx.objectStore("files");
+        const req = store.getAll();
+        req.onsuccess = () => { try{ db.close(); }catch(e){}; resolve(req.result || []); };
+        req.onerror = () => { try{ db.close(); }catch(e){}; reject(req.error || new Error("Failed to read files")); };
+      });
+    }
+
+    function blobToDataUrl(blob){
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result || ""));
+        r.onerror = () => reject(r.error || new Error("Failed to encode blob"));
+        r.readAsDataURL(blob);
+      });
+    }
+
+    function dataUrlToBlob(dataUrl){
+      // data:[mime];base64,....
+      try{
+        const m = String(dataUrl).match(/^data:([^;]*);base64,(.*)$/);
+        if (!m) return null;
+        const mime = m[1] || "application/octet-stream";
+        const b64 = m[2] || "";
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i=0; i<bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return new Blob([bytes], { type: mime });
+      }catch(e){
+        return null;
+      }
+    }
+
+    async function exportAllData(){
+      // Disable buttons during export to avoid double-clicks
+      const btn = $("#exportNowBtn") || $("#exportBtn");
+      if (btn) btn.disabled = true;
+
+      try{
+        const mokuro = exportMokuroLocalStorage();
+
+        // Export local file blobs from IndexedDB
+        const fileRecs = await idbGetAllLocalFiles();
+        const files = [];
+        for (const rec of fileRecs){
+          if (!rec || typeof rec !== "object") continue;
+          const blob = rec.blob;
+          const encoded = (blob instanceof Blob) ? await blobToDataUrl(blob) : "";
+          files.push({
+            id: rec.id,
+            name: rec.name || "",
+            type: rec.type || (blob && blob.type) || "",
+            lastModified: rec.lastModified || null,
+            dataUrl: encoded
+          });
         }
-        settings = {
-          ...structuredClone(DEFAULT_SETTINGS),
-          ...incoming,
-          ui: { ...structuredClone(DEFAULT_SETTINGS.ui), ...(incoming.ui || {}) },
-          meta: { ...(incoming.meta || {}) },
-          seriesMeta: { ...(incoming.seriesMeta || {}) },
-          links: Array.isArray(incoming.links) ? incoming.links : []
+
+        const payload = {
+          version: 4,
+          exportedAt: new Date().toISOString(),
+          settings: settings,
+          mokuroLocalStorage: mokuro,
+          localFiles: files
         };
-        if (settings.version === 2) settings.version = 3;
-        if (!settings.seriesMeta || typeof settings.seriesMeta !== "object") settings.seriesMeta = {};
-        saveSettings();
-        applyTheme();
-        $("#searchInput").value = settings.ui.search || "";
-        activeTagFiltersDraft = new Set(settings.ui.activeTagFilters || []);
-        refreshBooks();
-        route();
+        downloadJSON(`bookshelf-export-${new Date().toISOString().slice(0,10)}.json`, payload);
+      }catch(err){
+        console.error(err);
+        alert("Export failed. See console for details.");
+      }finally{
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function importAllDataFromFile(file){
+      const btn = $("#importSelectedBtn") || $("#importBtn");
+      if (btn) btn.disabled = true;
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try{
+          const payload = safeJSONParse(reader.result, null);
+          if (!payload || typeof payload !== "object"){
+            alert("That file doesn't look like JSON.");
+            return;
+          }
+
+          // Accept older exports that were settings-only
+          const incomingSettings = payload.settings || payload;
+          const incomingVersion = payload.version || incomingSettings.version || 0;
+
+          // 1) Restore files first (so local-file tiles can open immediately)
+          const files = Array.isArray(payload.localFiles) ? payload.localFiles : [];
+          for (const f of files){
+            if (!f || typeof f !== "object") continue;
+            if (!f.id) continue;
+            const blob = f.dataUrl ? dataUrlToBlob(f.dataUrl) : null;
+            if (!blob) continue;
+            await idbPutLocalFile({
+              id: f.id,
+              name: f.name || "",
+              type: f.type || blob.type || "",
+              lastModified: f.lastModified || null,
+              blob
+            });
+          }
+
+          // 2) Restore mokuro localStorage progress + book list
+          if (payload.mokuroLocalStorage) importMokuroLocalStorage(payload.mokuroLocalStorage);
+
+          // 3) Restore settings
+          if (!incomingSettings || typeof incomingSettings !== "object"){
+            alert("No settings found in that export.");
+            return;
+          }
+          // Support version 2/3 (settings files) and version 4 (full export)
+          if (!(incomingSettings.version===2 || incomingSettings.version===3 || incomingVersion===4)){
+            // still allow raw settings object
+          }
+
+          settings = {
+            ...structuredClone(DEFAULT_SETTINGS),
+            ...incomingSettings,
+            ui: { ...structuredClone(DEFAULT_SETTINGS.ui), ...(incomingSettings.ui || {}) },
+            meta: { ...(incomingSettings.meta || {}) },
+            seriesMeta: { ...(incomingSettings.seriesMeta || {}) },
+            links: Array.isArray(incomingSettings.links) ? incomingSettings.links : []
+          };
+          if (settings.version === 2) settings.version = 3;
+          if (!settings.seriesMeta || typeof settings.seriesMeta !== "object") settings.seriesMeta = {};
+
+          saveSettings();
+          applyTheme();
+          $("#searchInput").value = settings.ui.search || "";
+          activeTagFiltersDraft = new Set(settings.ui.activeTagFilters || []);
+          refreshBooks();
+          route();
+        }catch(err){
+          console.error(err);
+          alert("Import failed. See console for details.");
+        }finally{
+          if (btn) btn.disabled = false;
+        }
       };
       reader.readAsText(file);
     }
+
 
     // ----------------------------
     // Modals
@@ -3224,7 +3387,7 @@ function renderStatusGrids(bookList, refs){
               <div id="linkLocalFields" style="display:none;">
                 <label>Local file</label>
                 <input class="field" id="linkLocalFileInput" type="file" />
-                <div class="help">The file is stored in this browser (IndexedDB). If you export/import settings on another device, you’ll need to re-add the file there.</div>
+                <div class="help">Local files are stored in this browser (IndexedDB). Full Export/Import includes them, so you can move everything to another device.</div>
                 <div id="linkLocalFileInfo" class="help" style="margin-top:6px;"></div>
               </div>
 
@@ -3718,10 +3881,10 @@ if (localFileInput){
             </div>
             <div>
               <label>Data</label>
-              <div class="help">Export/import saves your tags, series assignments, and UI preferences.</div>
+              <div class="help">Export/import saves everything: your bookshelf entries (including local files), series/tags, UI settings, and Mokuro reading progress.</div>
               <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-                <button class="btn primary" id="exportNowBtn" type="button">Export settings</button>
-                <button class="btn" id="importNowBtn" type="button">Import settings</button>
+                <button class="btn primary" id="exportNowBtn" type="button">Export data</button>
+                <button class="btn" id="importNowBtn" type="button">Import data</button>
               </div>
             </div>
           </div>
@@ -3841,7 +4004,7 @@ if (localFileInput){
       $("#pillColorFuture").addEventListener("change", savePillColours);
       $("#pillColorFinished").addEventListener("change", savePillColours);
 
-      $("#exportNowBtn").addEventListener("click", exportSiteSettings);
+      $("#exportNowBtn").addEventListener("click", exportAllData);
       $("#importNowBtn").addEventListener("click", () => $("#importFileInput").click());
 
       // Tag + series chips
@@ -4065,13 +4228,13 @@ function applyTheme(){
       });
 
       const _exportBtn = $("#exportBtn");
-      if (_exportBtn) _exportBtn.addEventListener("click", exportSiteSettings);
+      if (_exportBtn) _exportBtn.addEventListener("click", exportAllData);
 const _importBtn = $("#importBtn");
       if (_importBtn) _importBtn.addEventListener("click", () => $("#importFileInput").click());
 $("#importFileInput").addEventListener("change", (e) => {
         const file = e.target.files && e.target.files[0];
         if (!file) return;
-        importSiteSettingsFromFile(file);
+        importAllDataFromFile(file);
         e.target.value = "";
       });
 
