@@ -381,7 +381,7 @@
       flex: 1 1 auto;
     }
         .shelf-panel .book-title{
-      font-size: 1em;
+      font-size: 1.12em;
       min-height: unset;
     }
     .shelf-panel .book-sub,
@@ -612,9 +612,7 @@
       background: transparent;
     }
     #seriesPage .book-overlay{
-      background:
-        linear-gradient(to bottom, rgba(0,0,0,.52), rgba(0,0,0,0) 42%),
-        linear-gradient(to top, rgba(0,0,0,.45), rgba(0,0,0,0) 58%);
+      background: linear-gradient(to top, rgba(0,0,0,.58), rgba(0,0,0,0) 62%);
     }
 
 
@@ -805,9 +803,7 @@
     .book-overlay{
       position:absolute;
       inset: 0;
-      background:
-        linear-gradient(to bottom, rgba(0,0,0,.52), rgba(0,0,0,0) 42%),
-        linear-gradient(to top, rgba(0,0,0,.45), rgba(0,0,0,0) 58%);
+      background: linear-gradient(to top, rgba(0,0,0,.58), rgba(0,0,0,0) 62%);
       pointer-events:none;
     }
 
@@ -1482,30 +1478,30 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
     </div>
   </template>
 
-  <template id="book-card-template">
+    <template id="book-card-template">
     <div class="card book-card">
       <div class="book-top">
         <img alt="Cover" />
         <div class="book-overlay"></div>
 
-            <button class="star-btn" type="button" data-action="star" title="Star">☆</button>
-
-            <div class="book-actions">
-              <div class="icon-btn" data-action="edit" title="Edit tags / series">✏️</div>
-              <div class="icon-btn" data-action="remove" title="Remove from this shelf (does not delete files)">🗑️</div>
-            </div>
-          </div>
-        </div>
-
         <a class="book-open" data-action="open" href="#" style="position:absolute; inset:0; z-index:1;" aria-label="Open book"></a>
 
         <div class="book-meta">
-        <div class="tile-actions" aria-label="Tile actions">
-<div class="tile-actions-panel" aria-label="Actions panel">
-            <div class="tag-hover" aria-label="Tags">
-              <button class="tag-icon" type="button" title="Tags">🏷️</button>
-              <div class="tag-pop"></div>
+          <div class="tile-actions" aria-label="Tile actions">
+            <div class="tile-actions-panel" aria-label="Actions panel">
+              <div class="tag-hover" aria-label="Tags">
+                <button class="tag-icon" type="button" title="Tags">🏷️</button>
+                <div class="tag-pop"></div>
+              </div>
+
+              <button class="star-btn" type="button" data-action="star" title="Star">☆</button>
+
+              <div class="book-actions">
+                <div class="icon-btn" data-action="edit" title="Edit tags / series">✏️</div>
+                <div class="icon-btn" data-action="remove" title="Remove from this shelf (does not delete files)">🗑️</div>
+              </div>
             </div>
+          </div>
 
           <div class="book-title"></div>
           <div class="book-sub"></div>
