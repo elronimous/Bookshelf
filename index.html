@@ -1727,6 +1727,8 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
         path,
         title: fileName,
         displayTitle: (meta.displayTitle || "").trim(),
+        mokuroRelPath: (meta.mokuroRelPath || ""),
+        coverPage: mokuro.cover_page,
         seriesNumber: (typeof meta.seriesNumber === "number" && Number.isFinite(meta.seriesNumber)) ? meta.seriesNumber : null,
         coverUrl,
         currentPage,
@@ -2021,7 +2023,32 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
         console.error(err);
         alert("Couldn't open that Mokuro file from the linked folder. See console for details.");
       }
+    
+// Cache object URLs for Mokuro cover images loaded from the linked folder
+const _mokuroCoverUrlCache = new Map();
+async function setCoverFromLinkedMokuro(imgEl, coverRelPath){
+  try{
+    if (!imgEl || !coverRelPath) return;
+    const rel = normaliseSlashes(coverRelPath);
+    const cached = _mokuroCoverUrlCache.get(rel);
+    if (cached){
+      imgEl.src = cached;
+      return;
     }
+    const root = await getLinkedMokuroFolder();
+    if (!root) return;
+    const ok = await ensureHandlePermission(root);
+    if (!ok) return;
+    const fh = await getFileHandleByRelPath(root, rel);
+    if (!fh) return;
+    const file = await fh.getFile();
+    const url = URL.createObjectURL(file);
+    _mokuroCoverUrlCache.set(rel, url);
+    imgEl.src = url;
+  }catch(e){}
+}
+
+}
 
     async function refreshLibraryToUseLinkedMokuroFolder(dirHandle){
       try{
@@ -2051,6 +2078,24 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
           }
         }
 
+
+// Also map Mokuro progress entries (mokuro_*) so local Mokuro tiles open from the linked folder
+try{
+  const keys = Object.keys(localStorage || {}).filter(k => typeof k === "string" && k.startsWith(STORAGE_PREFIX));
+  for (const k of keys){
+    const p = decodeMokuroPathFromKey(k);
+    const rel2 = extractMokuroRelPathFromUrl(p, rootName);
+    if (!rel2) continue;
+    const relNorm2 = normaliseSlashes(rel2);
+    if (!set.has(relNorm2)) continue;
+    const mm = ensureMeta(p);
+    if (mm.mokuroRelPath !== relNorm2){
+      mm.mokuroRelPath = relNorm2;
+      mm.mokuroUrlFallback = mm.mokuroUrlFallback || p || "";
+      changed = true;
+    }
+  }
+}catch(e){}
         if (changed){
           saveSettings();
         }
@@ -2484,6 +2529,29 @@ function seriesLineForItem(item){
       wireTagHover(card, book.tags);
 const openA = card.querySelector('[data-action="open"]');
       openA.href = book.path;
+
+// If this Mokuro tile corresponds to a file inside the linked Mokuro folder,
+// open it from disk (via the folder handle) instead of using a GitHub/file URL.
+const bmeta = getMeta(book.path) || {};
+const rel = (bmeta.mokuroRelPath || book.mokuroRelPath || "").trim();
+if (rel && settings.ui && settings.ui.mokuroFolderLinked){
+  openA.href = "#";
+  openA.removeAttribute("target");
+  openA.removeAttribute("rel");
+  openA.setAttribute("aria-label", "Open Mokuro file");
+  openA.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openMokuroFromLinkedFolder(rel);
+  }, { passive:false });
+
+  // Try to load the cover from the linked folder so the tile image isn't broken
+  if (book.coverPage){
+    const coverRel = normaliseSlashes(rel.replace(/\.html$/i, "") + "/" + book.coverPage);
+    setCoverFromLinkedMokuro(img, coverRel);
+  }
+}
+
 
       // Star
       const starBtn = card.querySelector('[data-action="star"]');
