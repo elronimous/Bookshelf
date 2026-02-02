@@ -1764,7 +1764,7 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
     // but the file blobs live in this browser's IndexedDB.
     // ----------------------------
     const FILE_DB_NAME = "BookshelfLocalFiles";
-    const FILE_DB_VERSION = 1;
+    const FILE_DB_VERSION = 2;
 
     function openFileDB(){
       return new Promise((resolve, reject) => {
@@ -1774,6 +1774,10 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
             const db = req.result;
             if (!db.objectStoreNames.contains("files")){
               db.createObjectStore("files", { keyPath: "id" });
+            }
+            // File System Access API handles (e.g., linked Mokuro folder)
+            if (!db.objectStoreNames.contains("handles")){
+              db.createObjectStore("handles", { keyPath: "key" });
             }
           };
           req.onsuccess = () => resolve(req.result);
@@ -1814,7 +1818,101 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
       });
     }
 
-    async function openLocalFileById(fileId){
+    
+
+    // --- File System Access API handle storage (IndexedDB) ---
+    // Stores directory handles for features like "Linked Mokuro folder".
+    async function idbPutHandle(key, handle){
+      const db = await openFileDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(["handles"], "readwrite");
+        tx.oncomplete = () => { try{ db.close(); }catch(e){}; resolve(true); };
+        tx.onerror = () => { try{ db.close(); }catch(e){}; reject(tx.error || new Error("Failed to store handle")); };
+        tx.objectStore("handles").put({ key, handle });
+      });
+    }
+
+    async function idbGetHandle(key){
+      const db = await openFileDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(["handles"], "readonly");
+        const req = tx.objectStore("handles").get(key);
+        req.onsuccess = () => { try{ db.close(); }catch(e){}; resolve(req.result || null); };
+        req.onerror = () => { try{ db.close(); }catch(e){}; reject(req.error || new Error("Failed to read handle")); };
+      });
+    }
+
+    async function idbDeleteHandle(key){
+      const db = await openFileDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(["handles"], "readwrite");
+        tx.oncomplete = () => { try{ db.close(); }catch(e){}; resolve(true); };
+        tx.onerror = () => { try{ db.close(); }catch(e){}; reject(tx.error || new Error("Failed to delete handle")); };
+        tx.objectStore("handles").delete(key);
+      });
+    }
+
+    async function ensureHandlePermission(handle){
+      if (!handle) return false;
+      try{
+        const opts = { mode: "read" };
+        const qp = await handle.queryPermission(opts);
+        if (qp === "granted") return true;
+        const rp = await handle.requestPermission(opts);
+        return (rp === "granted");
+      }catch(err){
+        return false;
+      }
+    }
+
+    async function linkMokuroFolder(){
+      if (!window.showDirectoryPicker){
+        alert("Your browser doesn't support linking a folder here. Try Chrome or Edge.");
+        return null;
+      }
+      try{
+        const dirHandle = await window.showDirectoryPicker({ mode: "read" });
+        const ok = await ensureHandlePermission(dirHandle);
+        if (!ok){
+          alert("Permission was not granted, so the folder wasn't linked.");
+          return null;
+        }
+        await idbPutHandle("mokuroRoot", dirHandle);
+        settings.ui.mokuroFolderLinked = true;
+        settings.ui.mokuroFolderName = dirHandle.name || "";
+        saveSettings();
+        return dirHandle;
+      }catch(err){
+        // user may have cancelled
+        if (err && (err.name === "AbortError" || err.name === "NotAllowedError")) return null;
+        console.error(err);
+        alert("Couldn't link that folder. See console for details.");
+        return null;
+      }
+    }
+
+    async function unlinkMokuroFolder(){
+      try{
+        await idbDeleteHandle("mokuroRoot");
+      }catch(e){}
+      settings.ui.mokuroFolderLinked = false;
+      settings.ui.mokuroFolderName = "";
+      saveSettings();
+      return true;
+    }
+
+    async function getLinkedMokuroFolder(){
+      try{
+        const rec = await idbGetHandle("mokuroRoot");
+        if (!rec || !rec.handle) return null;
+        const ok = await ensureHandlePermission(rec.handle);
+        return ok ? rec.handle : rec.handle; // return handle even if permission pending
+      }catch(e){
+        return null;
+      }
+    }
+
+async function openLocalFileById(fileId){
       if (!fileId) return;
       try{
         const rec = await idbGetLocalFile(fileId);
@@ -3885,7 +3983,21 @@ if (localFileInput){
             </div>
           </div>
 
+          
           <div class="divider"></div>
+
+          <div>
+            <label>Mokuro folder</label>
+            <div class="help">Link the local folder that contains your Mokuro volumes (useful when hosting this page on GitHub Pages). Supported in Chrome/Edge.</div>
+            <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn" id="linkMokuroFolderBtn" type="button">Link your Mokuro folder</button>
+              <button class="btn danger" id="unlinkMokuroFolderBtn" type="button">Unlink</button>
+            </div>
+            <div class="help" id="mokuroFolderStatus" style="margin-top:8px;"></div>
+          </div>
+
+
+<div class="divider"></div>
 
 
           <div class="divider"></div>
@@ -4002,6 +4114,42 @@ if (localFileInput){
 
       $("#exportNowBtn").addEventListener("click", exportAllData);
       $("#importNowBtn").addEventListener("click", () => $("#importFileInput").click());
+
+      async function refreshMokuroFolderStatus(){
+        const el = $("#mokuroFolderStatus");
+        if (!el) return;
+        const name = (settings.ui && settings.ui.mokuroFolderName) ? settings.ui.mokuroFolderName : "";
+        const rec = await idbGetHandle("mokuroRoot").catch(()=>null);
+        if (rec && rec.handle){
+          const perm = await (async()=>{
+            try{
+              return await rec.handle.queryPermission({mode:"read"});
+            }catch(e){ return "prompt"; }
+          })();
+          const permText = (perm==="granted") ? "permission granted" : "permission needed";
+          el.textContent = name ? `Linked: ${name} (${permText})` : `Linked folder (${permText})`;
+        } else {
+          el.textContent = "Not linked";
+        }
+      }
+
+      const linkBtn = $("#linkMokuroFolderBtn");
+      const unlinkBtn = $("#unlinkMokuroFolderBtn");
+      if (linkBtn){
+        linkBtn.addEventListener("click", async () => {
+          await linkMokuroFolder();
+          await refreshMokuroFolderStatus();
+        });
+      }
+      if (unlinkBtn){
+        unlinkBtn.addEventListener("click", async () => {
+          const ok = confirm("Unlink the Mokuro folder?");
+          if (!ok) return;
+          await unlinkMokuroFolder();
+          await refreshMokuroFolderStatus();
+        });
+      }
+      refreshMokuroFolderStatus();
 
       // Tag + series chips
       const allTags = uniqueSorted(books.flatMap(b => b.tags || []).filter(Boolean));
