@@ -1,0 +1,4246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bookshelf</title>
+
+  <style>
+    :root{
+      --bg: #0b0f17;
+      --panel: rgba(255,255,255,.06);
+      --panel-2: rgba(255,255,255,.09);
+      --text: rgba(255,255,255,.92);
+      --muted: rgba(255,255,255,.70);
+      --faint: rgba(255,255,255,.45);
+      --border: rgba(255,255,255,.12);
+      --shadow: 0 12px 40px rgba(0,0,0,.35);
+      --shadow-2: 0 10px 24px rgba(0,0,0,.28);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --ring: 0 0 0 4px rgba(142,197,255,.18);
+      --accent: #8ec5ff;
+      --good: #7ee787;
+      --warn: #ffd479;
+      --bad: #ff7b72;
+      --chip: rgba(142,197,255,.14);
+      --chip-border: rgba(142,197,255,.28);
+    }
+    body[data-theme="light"]{
+      --bg: #f6f7fb;
+      --panel: rgba(0,0,0,.045);
+      --panel-2: rgba(0,0,0,.065);
+      --text: rgba(0,0,0,.86);
+      --muted: rgba(0,0,0,.62);
+      --faint: rgba(0,0,0,.42);
+      --border: rgba(0,0,0,.10);
+      --shadow: 0 16px 40px rgba(0,0,0,.10);
+      --shadow-2: 0 12px 24px rgba(0,0,0,.10);
+      --ring: 0 0 0 4px rgba(0,102,255,.14);
+      --accent: #0066ff;
+      --chip: rgba(0,102,255,.10);
+      --chip-border: rgba(0,102,255,.18);
+    }
+
+    *{ box-sizing: border-box; }
+    html, body{ height: 100%; }
+    body{
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background:
+        radial-gradient(1200px 800px at 10% -20%, rgba(142,197,255,.22), transparent 60%),
+        radial-gradient(900px 600px at 110% 10%, rgba(255,176,117,.14), transparent 55%),
+        radial-gradient(1000px 700px at 50% 120%, rgba(126,231,135,.12), transparent 58%),
+        var(--bg);
+            background-attachment: fixed;
+      background-repeat: no-repeat;
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    a{ color: inherit; text-decoration: none; }
+    button, input, select, textarea{
+      font: inherit;
+      color: inherit;
+    }
+
+    .container{
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 14px;
+}
+
+.app{
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 108px 14px 40px; /* room for fixed header */
+}
+
+    /* Header */
+.topbar{
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  padding: 10px 0 8px;
+  background: linear-gradient(to bottom, rgba(6, 8, 12, .78), rgba(6, 8, 12, 0));
+  pointer-events: none;
+}
+
+.topbar-inner{
+  pointer-events: auto;
+  display:flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(8, 8, 12, .86);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 16px;
+  padding: 10px 10px;
+  box-shadow: 0 10px 26px rgba(0,0,0,.28);
+}
+
+.brand{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      min-width: 170px;
+    }
+    .logo{
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      background-color: rgba(255,255,255,.04);
+      background-image: url("data:image/png;base64,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");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: cover;
+      box-shadow: 0 10px 24px rgba(0,0,0,.22);
+    }
+    .title{
+      display:flex;
+      flex-direction: column;
+      line-height: 1.1;
+    }
+    .title strong{
+      font-size: 14px;
+      letter-spacing: .2px;
+    }
+    .title span{
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .search{
+      flex:1;
+      display:flex;
+      gap: 10px;
+      align-items:center;
+      justify-content: center;
+      min-width: 240px;
+    }
+    .search input{
+      width: min(520px, 100%);
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      outline: none;
+    }
+    body[data-theme="light"] .search input{
+      background: rgba(0,0,0,.03);
+    }
+    .search input:focus{
+      box-shadow: var(--ring);
+      border-color: rgba(142,197,255,.35);
+    }
+
+    .actions{
+      display:flex;
+      gap: 8px;
+      align-items:center;
+      justify-content:flex-end;
+      min-width: 210px;
+    }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      cursor: pointer;
+      user-select: none;
+    }
+    body[data-theme="light"] .btn{
+      background: rgba(0,0,0,.03);
+    }
+    .btn:hover{ background: rgba(255,255,255,.09); }
+    body[data-theme="light"] .btn:hover{ background: rgba(0,0,0,.06); }
+    .btn:active{ transform: translateY(1px); }
+
+    .btn.primary{
+      border-color: rgba(142,197,255,.28);
+      background: rgba(142,197,255,.14);
+    }
+    .btn.primary:hover{ background: rgba(142,197,255,.18); }
+
+    .pill{
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+      white-space: nowrap;
+    }
+    .count-pill{
+      background: var(--pillBg, rgba(142,197,255,.20));
+      border-color: var(--pillBd, rgba(142,197,255,.35));
+      color: var(--text);
+      font-weight: 700;
+    }
+    .checkpill{
+      display:flex;
+      align-items:center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+      user-select:none;
+    }
+    .checkpill input{
+      transform: translateY(0.5px);
+      accent-color: #f6c14b;
+    }
+
+
+    /* Tag filter */
+    .tag-filter{
+      position: relative;
+    }
+    .tag-filter-panel{
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      width: 280px;
+      max-height: 360px;
+      overflow: auto;
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(15,20,32,.92);
+      box-shadow: var(--shadow);
+      display:none;
+    }
+    body[data-theme="light"] .tag-filter-panel{
+      background: rgba(255,255,255,.92);
+    }
+    .tag-filter-panel.open{ display:block; }
+    .tag-filter-panel h4{
+      margin: 0 0 10px;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+    .tag-filter-list{
+      display:flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 54px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tag-filter-list .chip{ cursor: pointer; user-select: none; }
+    .tag-filter-list .chip.active{ background: rgba(0,102,255,.22); border-color: rgba(0,102,255,.45); }
+    [data-theme="light"] .tag-filter-list .chip.active{ background: rgba(0,102,255,.12); border-color: rgba(0,102,255,.35); }
+    
+    .tag-filter-item{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text);
+    }
+    .tag-filter-item input{ width: 16px; height: 16px; }
+    .tag-filter-footer{
+      display:flex;
+      gap: 8px;
+      padding-top: 10px;
+      justify-content: flex-end;
+    }
+
+    /* Content */
+    .page{
+      margin-top: 2px;
+    }
+
+    /* Shelf panels (Reading / Starred / Future / Finished) */
+    .shelf-panel{
+      background: var(--panel-2);
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: calc(var(--radius) + 2px);
+      padding: 14px;
+      box-shadow: var(--shadow-2);
+      container-type: inline-size;
+    }
+    .shelf-panel .section-title{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 0;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,.10);
+    }
+    .cols-btn{
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.24);
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing: .2px;
+      cursor: pointer;
+    }
+    .cols-btn:hover{ border-color: rgba(142,197,255,.28); }
+    .cols-ctrl{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.18);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+    .cols-step{
+      width: 28px;
+      height: 26px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.28);
+      cursor: pointer;
+      font-weight: 900;
+      font-size: 14px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .cols-step:hover{ border-color: rgba(142,197,255,.28); }
+    .cols-val{
+      min-width: 26px;
+      padding: 0 6px;
+      height: 26px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing: .2px;
+      color: rgba(255,255,255,.92);
+    }
+
+
+    /* Home shelf grids: fixed columns per shelf via --cols, and scaled tile sizing/typography via CSS variables set per shelf */
+    .shelf-panel{
+      --cols: 5;
+      --tileScale: 1;
+      --tileH: 26em;
+      --coverH: 16em;
+      --gridGap: 12px;
+      --bodyPad: .72em;
+      --bodyGap: .55em;
+      --progH: 14px;
+    }
+    .shelf-panel .grid{
+      display:grid;
+      grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+      gap: var(--gridGap);
+    }
+
+    /* Make the whole card (including its fixed-height cover area) scale when the column count changes */
+    .shelf-panel .card{
+      font-size: calc(13px * var(--tileScale));
+      min-height: unset;
+      height: var(--tileH);
+    }
+    .shelf-panel .book-top{
+      height: 100%;
+      min-height: unset;
+      flex: 1 1 auto;
+    }
+        .shelf-panel .book-title{
+      font-size: 1em;
+      min-height: unset;
+    }
+    .shelf-panel .book-sub,
+    .shelf-panel .book-sub2{
+      font-size: .86em;
+    }
+        .shelf-panel .progress-overlay .progress-bar{ height: var(--progH); }
+    .shelf-panel.compact-progress .progress-pct{ display:none; }
+
+
+    .section-title{
+      display:flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 14px 6px 10px;
+    }
+    .section-title h2{
+      margin: 0;
+      font-size: 22px;
+      font-weight: 900;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      letter-spacing: .2px;
+    }
+
+    .shelf-panel .section-title h2::before{
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      background: var(--pillHex, var(--accent));
+      box-shadow: 0 0 0 3px rgba(0,0,0,.20);
+    }
+    .section-title .meta{
+      display:flex;
+      gap: 8px;
+      align-items:center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat( auto-fill, minmax(190px, 1fr) );
+      gap: 12px;
+    }
+
+    /* Fixed 5-across shelves (Reading/Future/Finished) */
+    .grid.grid-5{
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+    @media (max-width: 1200px){
+      .grid.grid-5{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+    @media (max-width: 980px){
+      .grid.grid-5{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (max-width: 720px){
+      .grid.grid-5{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 480px){
+      .grid.grid-5{ grid-template-columns: 1fr; }
+    }
+
+
+    .card{
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow-2);
+      overflow: hidden;
+      position: relative;
+    }
+    .card:hover{
+      border-color: rgba(142,197,255,.22);
+      /* transform removed to avoid GPU resample artifacts */
+      transition: transform .08s ease, border-color .08s ease;
+    }
+
+    .series-card{
+      display:flex;
+      flex-direction: column;
+      min-height: 330px;
+      cursor:pointer;
+    }
+
+.series-covers{
+      position: relative;
+      display:grid;
+      gap: 2px;
+      height: 330px;
+      background: rgba(255,255,255,.02);
+      overflow:hidden;
+    }
+    .series-covers[data-count="0"]{
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;
+    }
+    .series-covers[data-count="1"]{
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;
+    }
+    .series-covers[data-count="2"]{
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: 1fr;
+    }
+    .series-covers[data-count="3"]{
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+    }
+    .series-covers[data-count="4"]{
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+    }
+    .series-covers[data-count="3"] img:nth-child(3){
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+    .series-covers img{
+      width:100%;
+      height:100%;
+      object-fit: cover;
+      display:block;
+      /* filter removed to avoid scaling artifacts */
+}
+    
+    .series-overlay{
+      position:absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,.64), rgba(0,0,0,0) 55%);
+      pointer-events:none;
+    }
+    .series-meta{
+      position:absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 12px;
+      display:flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events:none;
+    }
+    .series-name{
+      font-weight: 900;
+      font-size: 15px;
+      letter-spacing: .2px;
+      color: #fff;
+      text-shadow:
+        0 0 2px rgba(0,0,0,1),
+        0 2px 8px rgba(0,0,0,1),
+        0 6px 18px rgba(0,0,0,1),
+        0 12px 34px rgba(0,0,0,.98),
+        0 18px 52px rgba(0,0,0,.90);
+
+      overflow:hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .series-sub{
+      font-size: 12px;
+      color: rgba(255,255,255,.82);
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      text-shadow: 0 2px 10px rgba(0,0,0,.35);
+    }
+    .series-tags{
+      display:flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+      max-height: 40px;
+      overflow: hidden;
+    }
+    .series-meta .chip{
+      background: rgba(0,0,0,.42);
+      border-color: rgba(255,255,255,.16);
+      color: rgba(255,255,255,.90);
+    }
+.book-card{
+      min-height: 330px;
+    }
+    
+    .book-top{
+      position: relative;
+      height: 100%;
+      min-height: 330px;
+      background: rgba(0,0,0,.22);
+      overflow: hidden;
+      /* keep pseudo-elements and absolute overlays neatly layered */
+      isolation: isolate;
+    }
+
+    /* Covers: keep tiles neat + consistent.
+       We fill the frame (no awkward empty margins), and rely on hover preview for the full cover. */
+    .book-top > img{
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      z-index: 0;
+      transform: translateZ(0);
+    }
+
+    /* Disable the blurred background layer from earlier versions (keeps things crisp and tidy). */
+    .book-top::before,
+    .book-top::after{
+      display:none;
+      content:none;
+    }
+
+/* Series page: match the homepage tile look (consistent cover sizing + tidy grid) */
+    #seriesPage .book-top{
+      height: 100%;
+      min-height: 330px;
+      aspect-ratio: auto;
+      background: rgba(0,0,0,.22);
+    }
+    #seriesPage .book-top > img{
+      object-fit: cover;
+      object-position: center;
+      background: transparent;
+    }
+    #seriesPage .book-overlay{
+      background:
+        linear-gradient(to bottom, rgba(0,0,0,.52), rgba(0,0,0,0) 42%),
+        linear-gradient(to top, rgba(0,0,0,.68), rgba(0,0,0,0) 58%);
+    }
+
+
+    
+.book-top > img,
+.series-covers img,
+.series-mosaic img{
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.tag-hover{
+      position:absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 4;
+      display:flex;
+      flex-direction: column;
+      align-items:flex-start;
+      gap: 8px;
+      pointer-events: auto;
+    }
+    .tag-icon{
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(0,0,0,.45);
+      color: rgba(255,255,255,.92);
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 10px 24px rgba(0,0,0,.28);
+    }
+    .tag-icon:focus{ outline: none; box-shadow: 0 0 0 3px rgba(142,197,255,.25), 0 10px 24px rgba(0,0,0,.28); }
+    .tag-pop{
+      display:none;
+      max-width: 240px;
+      padding: 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.72);
+      box-shadow: var(--shadow);
+    }
+    
+    .star-btn{
+      position:absolute;
+      right: 10px;
+      bottom: 54px;
+      z-index: 3;
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(0,0,0,.45);
+      color: rgba(255,255,255,.92);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      user-select:none;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 10px 24px rgba(0,0,0,.28);
+      font-size: 18px;
+      line-height: 1;
+    }
+    .star-btn:hover{ background: rgba(0,0,0,.62); }
+    .star-btn:not(.is-starred){
+      opacity: .55;
+    }
+    .star-btn.is-starred{
+      opacity: 1;
+      color: hsl(45 95% 60%);
+      text-shadow: 0 0 14px rgba(0,0,0,.25), 0 0 18px rgba(255,215,90,.22);
+    }
+    body[data-theme="light"] .star-btn{
+      background: rgba(255,255,255,.70);
+      color: rgba(0,0,0,.72);
+      border-color: rgba(0,0,0,.10);
+    }
+    body[data-theme="light"] .star-btn:hover{ background: rgba(255,255,255,.86); }
+    .star-btn.is-starred{
+      background: rgba(0,0,0,.70);
+      border-color: rgba(255,255,255,.22);
+    }
+    body[data-theme="light"] .star-btn.is-starred{
+      background: rgba(255,255,255,.92);
+    }
+
+
+    .reading-tick{
+      position:absolute;
+      left: 10px;
+      bottom: 10px;
+      z-index: 3;
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(0,0,0,.45);
+      color: rgba(255,255,255,.92);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      user-select:none;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 10px 24px rgba(0,0,0,.28);
+      font-size: 16px;
+      line-height: 1;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease, background .18s ease;
+    }
+    .book-top:hover .reading-tick,
+    .book-top:focus-within .reading-tick{
+      opacity: .95;
+      pointer-events: auto;
+    }
+    .reading-tick:hover{ transform: translateY(-1px); }
+    .reading-tick:not(.is-add):not(.is-remove):hover{ background: rgba(0,0,0,.62); }
+    body[data-theme="light"] .reading-tick{
+      background: rgba(255,255,255,.70);
+      color: rgba(0,0,0,.72);
+      border-color: rgba(0,0,0,.10);
+    }
+    body[data-theme="light"] .reading-tick:hover{ background: rgba(255,255,255,.86); }
+    .reading-tick.is-add{
+      opacity: 1;
+      background: rgba(126,231,135,.22);
+      border-color: rgba(126,231,135,.42);
+      color: rgba(255,255,255,.95);
+    }
+    .reading-tick.is-remove{
+      opacity: 1;
+      background: rgba(255,84,84,.22);
+      border-color: rgba(255,84,84,.42);
+      color: rgba(255,255,255,.95);
+    }
+    body[data-theme="light"] .reading-tick.is-add{
+      background: rgba(126,231,135,.22);
+      border-color: rgba(0,0,0,.12);
+      color: rgba(0,0,0,.75);
+    }
+    body[data-theme="light"] .reading-tick.is-remove{
+      background: rgba(255,84,84,.20);
+      border-color: rgba(0,0,0,.12);
+      color: rgba(0,0,0,.75);
+    }
+
+    .reading-tick::after{
+      content: attr(data-tip);
+      position:absolute;
+      left: 42px;
+      bottom: 50%;
+      transform: translateY(50%);
+      white-space: nowrap;
+      background: rgba(0,0,0,.72);
+      border: 1px solid rgba(255,255,255,.14);
+      padding: 6px 8px;
+      border-radius: 10px;
+      font-size: 12px;
+      color: rgba(255,255,255,.92);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .12s ease, transform .12s ease;
+    }
+    .reading-tick:hover::after{
+      opacity: 1;
+      transform: translateY(50%) translateX(2px);
+    }
+
+.tag-hover:hover .tag-pop,
+    .tag-hover:focus-within .tag-pop,
+    .tag-hover.open .tag-pop{
+      display:block;
+    }
+    .tag-pop .chip{
+      background: rgba(255,255,255,.12);
+      border-color: rgba(255,255,255,.18);
+    }
+    .tag-pop .chip.muted{ opacity: .7; }
+    .series-tile .tag-hover{ top: 44px; }
+    .book-overlay{
+      position:absolute;
+      inset: 0;
+      background:
+        linear-gradient(to bottom, rgba(0,0,0,.52), rgba(0,0,0,0) 42%),
+        linear-gradient(to top, rgba(0,0,0,.68), rgba(0,0,0,0) 58%);
+      pointer-events:none;
+    }
+
+    
+    .book-meta{
+      position:absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 3;
+      pointer-events: none;
+
+      /* tighter + cleaner (no blurred/gradient panel) */
+      padding: 6px 10px 0;
+      background: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    .book-meta .book-title{
+      font-weight: 900;
+      text-align: left;
+      letter-spacing: .05px;
+      line-height: 1.15;
+      color: rgba(255,255,255,.96);
+
+      display: -webkit-box;
+
+      /* readable on any cover without obscuring the art */
+      text-shadow:
+        0 4px 22px rgba(0,0,0,.98),
+        0 2px 6px rgba(0,0,0,.95),
+        0 0 3px rgba(0,0,0,1);
+
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-height: calc(1.15em * 2);
+    }
+    .book-meta .book-sub{
+      margin-top: 2px;
+      font-size: .86em;
+      font-weight: 800;
+      opacity: .95;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow:
+        0 0 2px rgba(0,0,0,1),
+        0 2px 7px rgba(0,0,0,1),
+        0 6px 16px rgba(0,0,0,.98),
+        0 12px 28px rgba(0,0,0,.88);
+      }
+    .book-sub2{
+      display:none !important;
+    }
+
+
+    .progress-overlay{
+      position:absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      z-index: 3;
+      pointer-events:none;
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      padding: 2px 2px 0;
+    }
+    .progress-overlay .progress-bar{
+      height: 11px;
+      flex: 1 1 auto;
+      border-radius: 999px;
+      overflow:hidden;
+      border: 1px solid rgba(255,255,255,.22);
+      background: rgba(0,0,0,.42);
+      position: relative;
+      box-shadow: 0 6px 16px rgba(0,0,0,.25);
+    }
+    .progress-overlay .progress-fill{
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--good));
+      box-shadow: 0 0 16px rgba(142,197,255,.35), 0 0 10px rgba(126,231,135,.20);
+    }
+    .progress-overlay .progress-pct{
+      display:block;
+      min-width: 44px;
+      text-align:right;
+      font-size: 12px;
+      font-weight: 950;
+      letter-spacing: .2px;
+      color: rgba(255,255,255,.96);
+      text-shadow: 0 2px 14px rgba(0,0,0,.75), 0 1px 2px rgba(0,0,0,.85);
+      padding-right: 2px;
+      line-height: 1;
+    }
+    /* Tile actions (toggle + panel) */
+.tile-actions{
+  position:absolute;
+  right: 10px;
+  bottom: 30px; /* sits just above the progress bar overlay */
+  z-index: 4;
+  pointer-events: auto;
+  display:flex;
+  flex-direction: column;
+  align-items:flex-end;
+  gap: 8px;
+}
+.tile-actions-toggle{
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(0,0,0,.32);
+  color: rgba(255,255,255,.94);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  user-select:none;
+  opacity: .38; /* low opacity */
+  transition: opacity .15s ease, transform .15s ease, background .15s ease;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  font-size: 20px;
+  line-height: 1;
+  padding: 0;
+}
+.book-card:hover .tile-actions-toggle{ opacity: .80; }
+.tile-actions-toggle:active{ transform: scale(.96); }
+
+.tile-actions-panel{
+  display:flex;
+  gap: 8px;
+  align-items:center;
+  justify-content:flex-end;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity .15s ease, transform .15s ease;
+}
+.book-card.actions-open .tile-actions-panel{
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.book-card.actions-open .tile-actions-toggle{ opacity: .85; }
+
+.tile-actions .book-actions{
+  position: static;
+  display:flex;
+  gap: 8px;
+  z-index: auto;
+}
+.tile-actions .tag-hover{
+  position: relative;
+  top: auto;
+  left: auto;
+  z-index: auto;
+  display:flex;
+  flex-direction: column;
+  align-items:flex-start;
+  gap: 8px;
+  pointer-events: auto;
+}
+/* Open tags upward because we're near the bottom */
+.tile-actions .tag-pop{
+  position:absolute;
+  bottom: 42px;
+  right: 0;
+  top: auto;
+}
+.tile-actions .star-btn{
+  position: static;
+  right: auto;
+  bottom: auto;
+  z-index: auto;
+}
+
+/* Unify the icon look so the strip reads neatly */
+.tile-actions .icon-btn,
+.tile-actions .tag-icon,
+.tile-actions .star-btn{
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(0,0,0,.45);
+  color: rgba(255,255,255,.92);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  user-select:none;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.tile-actions .icon-btn:hover,
+.tile-actions .tag-icon:hover,
+.tile-actions .star-btn:hover{ background: rgba(0,0,0,.62); border-color: rgba(255,255,255,.22); }
+
+body[data-theme="light"] .tile-actions .icon-btn,
+body[data-theme="light"] .tile-actions .tag-icon,
+body[data-theme="light"] .tile-actions .star-btn{
+  background: rgba(255,255,255,.70);
+  color: rgba(0,0,0,.86);
+  border-color: rgba(0,0,0,.16);
+}
+body[data-theme="light"] .tile-actions .icon-btn:hover,
+body[data-theme="light"] .tile-actions .tag-icon:hover,
+body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255,255,.92); }
+
+
+    .book-body{
+      padding: 10px;
+      display:flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .book-title{
+      font-weight: 950;
+      letter-spacing: .2px;
+      font-size: 14px;
+      line-height: 1.18;
+      color: rgba(255,255,255,.98);
+      /* stronger shadow for readability over bright covers */
+      text-shadow: 0 2px 14px rgba(0,0,0,.75), 0 1px 2px rgba(0,0,0,.85);
+      display:-webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .book-sub{
+      color: rgba(255,255,255,.82);
+      font-size: 12px;
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items:center;
+      text-shadow: 0 2px 10px rgba(0,0,0,.45);
+    }
+
+.book-sub2{
+  color: rgba(255,255,255,.78);
+  font-size: 12px;
+  display:flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items:center;
+  text-shadow: 0 2px 10px rgba(0,0,0,.40);
+}
+
+/* Series tiles reuse the book card layout */
+.series-tile .book-actions{ display:none; }
+.series-tile .book-open{ z-index: 3; }
+.series-tile .book-title{ min-height: unset; }
+.series-mosaic{
+  position:absolute;
+  inset: 0;
+  display:grid;
+  gap: 2px;
+  background: rgba(255,255,255,.03);
+  overflow:hidden;
+}
+.series-mosaic[data-count="0"],
+.series-mosaic[data-count="1"]{
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+.series-mosaic[data-count="2"]{
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: 1fr;
+}
+.series-mosaic[data-count="3"],
+.series-mosaic[data-count="4"]{
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+}
+.series-mosaic[data-count="3"] img:nth-child(3){
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+.series-mosaic img{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display:block;
+      /* filter removed to avoid scaling artifacts */
+}
+
+    .progress-wrap{
+      margin-top: auto;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow:hidden;
+      background: rgba(255,255,255,.04);
+    }
+    .progress-bar{
+      height: 14px;
+      width: 100%;
+      position: relative;
+      background: rgba(255,255,255,.03);
+    }
+    .progress-fill{
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, rgba(142,197,255,.95), rgba(126,231,135,.85));
+    }
+    .progress-text{
+      padding: 8px 10px 9px;
+      font-size: 12px;
+      color: var(--muted);
+      display:flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .chips{
+      display:flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+    }
+    .chip{
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--chip-border);
+      background: var(--chip);
+      font-size: 12px;
+      color: var(--text);
+      max-width: 100%;
+      overflow:hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .chip.muted{
+      border-color: var(--border);
+      background: rgba(255,255,255,.04);
+      color: var(--muted);
+    }
+
+    .split{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+    @media (min-width: 980px){
+      .split{
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .empty{
+      padding: 18px;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      color: var(--muted);
+      text-align: center;
+      background: rgba(255,255,255,.03);
+    }
+
+    .hidden{ display:none !important; }
+
+    /* Modal */
+    .modal-backdrop{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.75);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index: 100;
+      padding: 18px;
+    }
+    .modal-backdrop.open{ display:flex; }
+    .modal{
+      width: min(720px, 100%);
+      border-radius: 22px;
+      border: 1px solid var(--border);
+      background: rgba(15,20,32,.94);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    body[data-theme="light"] .modal{
+      background: rgba(255,255,255,.94);
+    }
+    .modal-header{
+      padding: 14px 16px;
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-header h3{
+      margin: 0;
+      font-size: 14px;
+      letter-spacing: .2px;
+    }
+    .modal-body{
+      padding: 16px;
+      max-height: min(72vh, 760px);
+      overflow: auto;
+    }
+    .modal-footer{
+      padding: 14px 16px;
+      display:flex;
+      justify-content:flex-end;
+      gap: 10px;
+      border-top: 1px solid var(--border);
+      background: rgba(255,255,255,.03);
+    }
+    body[data-theme="light"] .modal-footer{
+      background: rgba(0,0,0,.03);
+    }
+    .form{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .row{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    @media (min-width: 700px){
+      .row.two{
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    label{
+      font-size: 12px;
+      color: var(--muted);
+      display:block;
+      margin-bottom: 6px;
+    }
+    .field{
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      outline:none;
+    }
+    body[data-theme="light"] .field{
+      background: rgba(0,0,0,.03);
+    }
+    .field:focus{
+      box-shadow: var(--ring);
+      border-color: rgba(142,197,255,.35);
+    }
+    .help{
+      font-size: 12px;
+      color: var(--faint);
+      margin-top: 6px;
+      line-height: 1.35;
+    }
+    .divider{
+      height: 1px;
+      background: var(--border);
+      margin: 16px 0;
+    }
+    .danger{
+      border-color: rgba(255,123,114,.35) !important;
+      background: rgba(255,123,114,.10) !important;
+    }
+
+    /* Small screens */
+    @media (max-width: 720px){
+      .topbar-inner{
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .brand{ width: 100%; justify-content: center; }
+      .actions{ width: 100%; justify-content: center; }
+      .search{ width: 100%; }
+      .search input{ width: 100%; }
+    }
+  
+
+    /* Hover cover preview (desktop only) */
+    #hoverPreview{
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 270px;
+      max-width: min(360px, 46vw);
+      display: none;
+      z-index: 9999;
+      pointer-events: none;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(0,0,0,.78);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    #hoverPreview img{
+      width: 100%;
+      height: auto;
+      display: block;
+      background: rgba(0,0,0,.22);
+      object-fit: contain;
+    }
+    #hoverPreview .hp-meta{
+      padding: 10px 12px 12px;
+    }
+    #hoverPreview .hp-title{
+      font-weight: 900;
+      font-size: 13px;
+      line-height: 1.2;
+      text-shadow: 0 2px 10px rgba(0,0,0,.75), 0 1px 0 rgba(0,0,0,.45);
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-height: calc(1.2em * 3);
+    }
+    #hoverPreview .hp-sub{
+      margin-top: 6px;
+      font-size: 12px;
+      color: rgba(255,255,255,.72);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+</style>
+</head>
+
+<body data-theme="dark">
+  <div class="topbar">
+    <div class="container">
+      <div class="topbar-inner">
+        <div class="brand" role="button" title="Go to home" id="homeBtn">
+          <div class="logo" aria-hidden="true"></div>
+          <div class="title">
+            <strong>Bookshelf</strong>
+            <span id="subtitle">LocalStorage tracker</span>
+          </div>
+        </div>
+
+        <div class="search">
+          <input id="searchInput" type="search" placeholder="Search titles, series, or tags…" autocomplete="off" />
+        </div>
+
+        <div class="actions">
+          <div class="tag-filter">
+            <button class="btn" id="tagFilterBtn" type="button" title="Filter by tags">🏷️ Tags</button>
+            <div class="tag-filter-panel" id="tagFilterPanel" aria-label="Tag filters">
+              <h4>Tags</h4>
+              <div class="help" style="margin-top:4px;">Click tags to toggle the filter.</div>
+              <div class="tag-filter-list" id="tagFilterList"></div>
+              <div class="tag-filter-footer">
+                <button class="btn" id="clearTagFiltersBtn" type="button">Clear</button>
+</div>
+            </div>
+          </div>
+          <button class="btn primary" id="addLinkBtn" type="button" title="Add a web book link">➕ Add</button>
+          <button class="btn" id="refreshBtn" type="button" title="Rescan localStorage">🔄</button>
+<button class="btn" id="settingsBtn" type="button" title="Settings">⚙️</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="app">
+    <div class="page" id="homePage">
+      <div class="split">
+        <div class="shelf-panel" data-shelf="reading" style="--cols:5;">
+          <div class="section-title">
+            <h2>Reading</h2>
+            <div class="meta">
+              <span class="pill count-pill" id="readingCountPill">0</span>
+              <div class="cols-ctrl" title="How many items wide?"><button class="cols-step" type="button" data-shelf-cols-step="reading" data-dir="-1" aria-label="Fewer per row">&lt;</button><span class="cols-val" data-shelf-cols-val="reading">5</span><button class="cols-step" type="button" data-shelf-cols-step="reading" data-dir="1" aria-label="More per row">&gt;</button></div>
+            </div>
+          </div>
+          <div class="grid" id="readingGrid"></div>
+        </div>
+
+        <div class="shelf-panel" data-shelf="starred" style="--cols:5;">
+          <div class="section-title">
+            <h2>Starred</h2>
+            <div class="meta">
+              <span class="pill count-pill" id="starredCountPill">0</span>
+              <div class="cols-ctrl" title="How many items wide?"><button class="cols-step" type="button" data-shelf-cols-step="starred" data-dir="-1" aria-label="Fewer per row">&lt;</button><span class="cols-val" data-shelf-cols-val="starred">5</span><button class="cols-step" type="button" data-shelf-cols-step="starred" data-dir="1" aria-label="More per row">&gt;</button></div>
+            </div>
+          </div>
+          <div class="grid" id="starredGrid"></div>
+        </div>
+
+        <div class="shelf-panel" data-shelf="future" style="--cols:5;">
+          <div class="section-title">
+            <h2>Library</h2>
+            <div class="meta">
+              <span class="pill count-pill" id="futureCountPill">0</span>
+              
+              <label class="library-filter" style="display:flex; gap:8px; align-items:center; font-size:12px; color: rgba(255,255,255,.88);">
+                <input type="checkbox" id="libraryShowAllToggle" />
+                <span>Include started</span>
+              </label>
+<div class="cols-ctrl" title="How many items wide?"><button class="cols-step" type="button" data-shelf-cols-step="future" data-dir="-1" aria-label="Fewer per row">&lt;</button><span class="cols-val" data-shelf-cols-val="future">5</span><button class="cols-step" type="button" data-shelf-cols-step="future" data-dir="1" aria-label="More per row">&gt;</button></div>
+            </div>
+          </div>
+          <div class="grid" id="futureGrid"></div>
+        </div>
+
+        <div class="shelf-panel" data-shelf="finished" style="--cols:5;">
+          <div class="section-title">
+            <h2>Finished</h2>
+            <div class="meta">
+              <span class="pill count-pill" id="finishedCountPill">0</span>
+              <div class="cols-ctrl" title="How many items wide?"><button class="cols-step" type="button" data-shelf-cols-step="finished" data-dir="-1" aria-label="Fewer per row">&lt;</button><span class="cols-val" data-shelf-cols-val="finished">5</span><button class="cols-step" type="button" data-shelf-cols-step="finished" data-dir="1" aria-label="More per row">&gt;</button></div>
+            </div>
+          </div>
+          <div class="grid" id="finishedGrid"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page hidden" id="seriesPage">
+      <div class="section-title">
+        <h2 id="seriesTitle">Series</h2>
+        <div class="meta">
+          <button class="btn" id="backBtn" type="button">← Back</button>
+          <label class="checkpill" title="If enabled, this series will not appear under Reading on the main page."><input type="checkbox" id="seriesNotReadingChk">Not currently reading</label>
+          <span class="pill" id="seriesBookCountPill">0</span>
+        </div>
+      </div>
+
+      <div class="grid grid-5" id="seriesAllGrid"></div>
+    </div>
+  </div>
+
+
+
+  <!-- Templates -->
+  <template id="series-card-template">
+    <div class="card series-card">
+      <div class="series-covers">
+        <img alt="" />
+        <img alt="" />
+        <img alt="" />
+        <img alt="" />
+        <div class="series-overlay"></div>
+        <div class="series-meta">
+          <div class="series-name"></div>
+          <div class="series-sub"></div>
+          <div class="series-tags"></div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <template id="book-card-template">
+    <div class="card book-card">
+      <div class="book-top">
+        <img alt="Cover" />
+        <div class="book-overlay"></div>
+
+        <div class="tile-actions" aria-label="Tile actions">
+          <button class="tile-actions-toggle" type="button" aria-label="Show actions" title="Actions">‹</button>
+          <div class="tile-actions-panel" aria-label="Actions panel">
+            <div class="tag-hover" aria-label="Tags">
+              <button class="tag-icon" type="button" title="Tags">🏷️</button>
+              <div class="tag-pop"></div>
+            </div>
+
+            <button class="star-btn" type="button" data-action="star" title="Star">☆</button>
+
+            <div class="book-actions">
+              <div class="icon-btn" data-action="edit" title="Edit tags / series">✏️</div>
+              <div class="icon-btn" data-action="remove" title="Remove from this shelf (does not delete files)">🗑️</div>
+            </div>
+          </div>
+        </div>
+
+        <a class="book-open" data-action="open" href="#" style="position:absolute; inset:0; z-index:1;" aria-label="Open book"></a>
+
+        <div class="book-meta">
+          <div class="book-title"></div>
+          <div class="book-sub"></div>
+          <div class="book-sub2" style="display:none;"></div>
+        </div>
+
+        <div class="progress-overlay" aria-label="Progress">
+          <div class="progress-bar"><div class="progress-fill"></div></div>
+          <span class="progress-pct"></span>
+        </div>
+      </div>
+    </div>
+  </template>
+
+<!-- Modals -->
+  <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true" aria-label="Modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalTitle">Modal</h3>
+        <button class="btn" id="modalCloseBtn" type="button">Close</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer" id="modalFooter"></div>
+    </div>
+  </div>
+
+  <input id="importFileInput" type="file" accept="application/json" style="display:none;" />
+
+  <script>
+    // ----------------------------
+    // Storage + Settings
+    // ----------------------------
+    const STORAGE_PREFIX = "mokuro_";
+    const SETTINGS_KEY = "bookshelf_settings_v2";
+
+    const DEFAULT_SETTINGS = {
+      version: 3,
+      updatedAt: null,
+      ui: {
+        theme: "dark",
+        search: "",
+        activeTagFilters: [],
+        homeCols: { reading: 5, starred: 5, future: 5, finished: 5 },
+        sectionPillColors: { reading: "#69b4ff", starred: "#f6c14b", future: "#b18cff", finished: "#67e0a3" },
+      },
+      links: [],
+      meta: {
+        // path => { tags: [], series: "" }
+      },
+      seriesMeta: {
+        // seriesName => { starred: true, notCurrentlyReading: true }
+      }
+    };
+
+    function safeJSONParse(str, fallback){
+      try { return JSON.parse(str); } catch { return fallback; }
+    }
+
+    function makeId(){
+      try{ return (crypto && crypto.randomUUID) ? crypto.randomUUID() : `id_${Date.now()}_${Math.random().toString(16).slice(2)}`; }
+      catch{ return `id_${Date.now()}_${Math.random().toString(16).slice(2)}`; }
+    }
+
+    function loadSettings(){
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      const parsed = safeJSONParse(raw, null);
+      if (!parsed || typeof parsed !== "object" || !(parsed.version===2 || parsed.version===3)){
+        return structuredClone(DEFAULT_SETTINGS);
+      }
+      const merged = structuredClone(DEFAULT_SETTINGS);
+      // Shallow merge
+      merged.updatedAt = parsed.updatedAt || null;
+      merged.ui = { ...merged.ui, ...(parsed.ui || {}) };
+
+      // Sanitize home column settings
+      if (!merged.ui.homeCols || typeof merged.ui.homeCols !== "object") {
+        merged.ui.homeCols = { reading: 5, starred: 5, future: 5, finished: 5 };
+      } else {
+        merged.ui.homeCols = {
+          reading: clampInt(merged.ui.homeCols.reading, 1, 12, 5),
+          starred: clampInt(merged.ui.homeCols.starred, 1, 12, 5),
+          future: clampInt(merged.ui.homeCols.future, 1, 12, 5),
+          finished: clampInt(merged.ui.homeCols.finished, 1, 12, 5),
+        };
+      }
+
+      // Sanitize section pill colours
+      const DEFAULT_PILLS = { reading: "#69b4ff", starred: "#f6c14b", future: "#b18cff", finished: "#67e0a3" };
+      if (!merged.ui.sectionPillColors || typeof merged.ui.sectionPillColors !== "object") {
+        merged.ui.sectionPillColors = structuredClone(DEFAULT_PILLS);
+      } else {
+        merged.ui.sectionPillColors = { ...DEFAULT_PILLS, ...merged.ui.sectionPillColors };
+      }
+      // Coerce to strings
+      for (const k of Object.keys(DEFAULT_PILLS)){
+        const v = merged.ui.sectionPillColors[k];
+        if (typeof v !== "string" || !v.trim()) merged.ui.sectionPillColors[k] = DEFAULT_PILLS[k];
+      }
+
+      merged.meta = { ...(parsed.meta || {}) };
+      merged.seriesMeta = { ...(parsed.seriesMeta || {}) };
+
+      // External "web link" items (Kindle/Bookwalker/etc)
+      merged.links = Array.isArray(parsed.links) ? parsed.links : [];
+      // Sanitize link entries
+      merged.links = merged.links.filter(x => x && typeof x === "object").map(x => {
+        const snRaw = (x.seriesNumber ?? null);
+        const snNum = (typeof snRaw === "number") ? snRaw : (typeof snRaw === "string" ? (parseInt(snRaw, 10) || null) : null);
+        const safeSeriesNumber = (typeof snNum === "number" && Number.isFinite(snNum) && snNum > 0) ? snNum : null;
+        return ({
+        id: (typeof x.id === "string" && x.id.trim()) ? x.id : makeId(),
+        title: (typeof x.title === "string") ? x.title : "",
+        displayTitle: (typeof x.displayTitle === "string") ? x.displayTitle : "",
+        url: (typeof x.url === "string") ? x.url : "",
+        imageUrl: (typeof x.imageUrl === "string") ? x.imageUrl : "",
+        imageData: (typeof x.imageData === "string") ? x.imageData : "",
+        status: (x.status === "reading" || x.status === "future" || x.status === "finished") ? x.status : "future",
+        starred: (x.starred === true),
+        tags: Array.isArray(x.tags) ? x.tags.map(t=>String(t||"").trim()).filter(Boolean) : [],
+        notCurrentlyReading: (x.notCurrentlyReading === true),
+        series: (typeof x.series === "string") ? x.series : "",
+        seriesNumber: safeSeriesNumber,
+      });
+      });
+      if (parsed.version === 2) merged.version = 3;
+      if (!merged.seriesMeta || typeof merged.seriesMeta !== "object") merged.seriesMeta = {};
+      return merged;
+    }
+
+    function saveSettings(){
+      settings.updatedAt = new Date().toISOString();
+      try{
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      }catch(err){
+        console.error("Failed to save settings to localStorage:", err);
+        alert("Couldn't save your settings to local storage (likely storage is full). If you imported or added large cover images, try using image URLs instead of uploads, or remove some uploaded images and try again.");
+      }
+    }
+
+    function getMeta(path){
+      const m = settings.meta[path];
+      if (!m || typeof m !== "object") return { tags: [], series: "", displayTitle: "", seriesNumber: null, starred: false, notCurrentlyReading: false };
+      return {
+        tags: Array.isArray(m.tags) ? m.tags : [],
+        series: (typeof m.series === "string") ? m.series : "",
+        displayTitle: (typeof m.displayTitle === "string") ? m.displayTitle : "",
+        seriesNumber: (typeof m.seriesNumber === "number" && Number.isFinite(m.seriesNumber)) ? m.seriesNumber : null,
+         starred: (m.starred === true),
+        notCurrentlyReading: (m.notCurrentlyReading === true)
+      };
+    }
+
+    function ensureMeta(path){
+      if (!settings.meta[path] || typeof settings.meta[path] !== "object"){
+        settings.meta[path] = { tags: [], series: "", displayTitle: "", seriesNumber: null, starred: false, notCurrentlyReading: false };
+      }
+      if (!Array.isArray(settings.meta[path].tags)) settings.meta[path].tags = [];
+      if (typeof settings.meta[path].series !== "string") settings.meta[path].series = "";
+      if (typeof settings.meta[path].displayTitle !== "string") settings.meta[path].displayTitle = "";
+      const n = settings.meta[path].seriesNumber;
+      if (!(typeof n === "number" && Number.isFinite(n))) settings.meta[path].seriesNumber = null;
+      if (settings.meta[path].starred !== true) settings.meta[path].starred = false;
+      if (settings.meta[path].notCurrentlyReading !== true) settings.meta[path].notCurrentlyReading = false;
+      return settings.meta[path];
+    }
+
+    function ensureSeriesMeta(seriesName){
+      if (!settings.seriesMeta || typeof settings.seriesMeta !== "object"){
+        settings.seriesMeta = {};
+      }
+      if (!settings.seriesMeta[seriesName] || typeof settings.seriesMeta[seriesName] !== "object"){
+        settings.seriesMeta[seriesName] = { starred: false };
+      }
+      if (settings.seriesMeta[seriesName].starred !== true) settings.seriesMeta[seriesName].starred = false;
+      return settings.seriesMeta[seriesName];
+    }
+
+    function getSeriesMeta(seriesName){
+      const sm = settings.seriesMeta && settings.seriesMeta[seriesName];
+      if (!sm || typeof sm !== "object") return { starred: false, notCurrentlyReading: false };
+      return {
+        starred: (sm.starred === true),
+        notCurrentlyReading: (sm.notCurrentlyReading === true),
+      };
+    }
+
+    // ----------------------------
+    // Book model
+    // ----------------------------
+    function determineProgressStatus(currentPage, totalPages){
+      if (currentPage === 1) return "future";
+      if (currentPage === totalPages) return "finished";
+      return "reading";
+    }
+
+    function decodeMokuroPathFromKey(key){
+      return decodeURI(key.substring(STORAGE_PREFIX.length));
+    }
+
+    function buildBookInfoFromStorageKey(key){
+      const path = decodeMokuroPathFromKey(key);
+      const mokuro = safeJSONParse(localStorage.getItem(key), null);
+      if (!mokuro || typeof mokuro !== "object") return null;
+      if (mokuro.cover_page === undefined) return null;
+
+      const currentPage = (mokuro.page_idx ?? 0) + 1;
+      const totalPages = (mokuro.last_page_idx ?? 0);
+      if (!totalPages || totalPages < 1) return null;
+
+      const percentComplete = Math.max(0, Math.min(100, Math.floor((currentPage/totalPages) * 100)));
+      const remainingPages = Math.max(0, totalPages - currentPage);
+      const status = determineProgressStatus(currentPage, totalPages);
+
+      const fileName = path.split("/").pop().replace(".html", "");
+      const coverUrl = `${path.replace(".html","")}/${mokuro.cover_page}`;
+
+      const meta = getMeta(path);
+      const series = (meta.series || "").trim();
+
+      return {
+        key,
+        path,
+        title: fileName,
+        displayTitle: (meta.displayTitle || "").trim(),
+        seriesNumber: (typeof meta.seriesNumber === "number" && Number.isFinite(meta.seriesNumber)) ? meta.seriesNumber : null,
+        coverUrl,
+        currentPage,
+        totalPages,
+        remainingPages,
+        percentComplete,
+        status,
+        tags: (meta.tags || []).map(t => (t || "").trim()).filter(Boolean),
+         starred: (meta.starred === true),
+        notCurrentlyReading: (meta.notCurrentlyReading === true),
+        series
+      };
+    }
+
+    function getAllBooks(){
+      const keys = Object.keys(localStorage).filter(k => k.startsWith(STORAGE_PREFIX));
+      const books = [];
+      for (const key of keys){
+        const info = buildBookInfoFromStorageKey(key);
+        if (info) books.push(info);
+      }
+      return books;
+    }
+
+
+    // ----------------------------
+    // External link items (Kindle/Bookwalker/etc)
+    // Stored inside settings.links so they export/import with settings.
+    // ----------------------------
+    
+    // ----------------------------
+    // Local file storage (IndexedDB)
+    // Stores blobs so you can open PDFs/CBZ/EPUB/etc from tiles.
+    // Note: Export/Import currently saves the *references* (ids + metadata) in settings,
+    // but the file blobs live in this browser's IndexedDB.
+    // ----------------------------
+    const FILE_DB_NAME = "BookshelfLocalFiles";
+    const FILE_DB_VERSION = 1;
+
+    function openFileDB(){
+      return new Promise((resolve, reject) => {
+        try{
+          const req = indexedDB.open(FILE_DB_NAME, FILE_DB_VERSION);
+          req.onupgradeneeded = (e) => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains("files")){
+              db.createObjectStore("files", { keyPath: "id" });
+            }
+          };
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error || new Error("Failed to open IndexedDB"));
+        }catch(err){
+          reject(err);
+        }
+      });
+    }
+
+    async function idbPutLocalFile(record){
+      const db = await openFileDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(["files"], "readwrite");
+        tx.oncomplete = () => { try{ db.close(); }catch(e){}; resolve(true); };
+        tx.onerror = () => { try{ db.close(); }catch(e){}; reject(tx.error || new Error("Failed to store file")); };
+        tx.objectStore("files").put(record);
+      });
+    }
+
+    async function idbGetLocalFile(id){
+      const db = await openFileDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(["files"], "readonly");
+        const req = tx.objectStore("files").get(id);
+        req.onsuccess = () => { try{ db.close(); }catch(e){}; resolve(req.result || null); };
+        req.onerror = () => { try{ db.close(); }catch(e){}; reject(req.error || new Error("Failed to read file")); };
+      });
+    }
+
+    async function idbDeleteLocalFile(id){
+      const db = await openFileDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(["files"], "readwrite");
+        tx.oncomplete = () => { try{ db.close(); }catch(e){}; resolve(true); };
+        tx.onerror = () => { try{ db.close(); }catch(e){}; reject(tx.error || new Error("Failed to delete file")); };
+        tx.objectStore("files").delete(id);
+      });
+    }
+
+    async function openLocalFileById(fileId){
+      if (!fileId) return;
+      try{
+        const rec = await idbGetLocalFile(fileId);
+        if (!rec || !rec.blob){
+          alert("That local file isn't available in this browser anymore. If you imported settings on a new device, you'll need to re-add the file.");
+          return;
+        }
+        const blob = rec.blob;
+        const url = URL.createObjectURL(blob);
+        // Open in a new tab (user-initiated from a click)
+        const w = window.open(url, "_blank", "noopener,noreferrer");
+        if (!w){
+          // fallback if popups blocked
+          location.href = url;
+        }
+        // Revoke after a while to avoid leaks (tab keeps its own handle)
+        setTimeout(() => { try{ URL.revokeObjectURL(url); }catch(e){} }, 60_000);
+      }catch(err){
+        console.error(err);
+        alert("Couldn't open that local file. See console for details.");
+      }
+    }
+function linkStatusToPercent(status){
+      if (status === "finished") return 100;
+      if (status === "reading") return 50;
+      return 0;
+    }
+
+    function linkStatusLabel(status){
+      if (status === "finished") return "Finished";
+      if (status === "reading") return "In progress";
+      return "Not started";
+    }
+
+    function linkProviderLabel(url){
+      const raw = (url || "").trim();
+      if (!raw) return "Link";
+      let host = "";
+      try {
+        host = new URL(normaliseUrl(raw)).hostname.toLowerCase();
+      } catch (e){
+        host = raw.toLowerCase();
+      }
+      if (host.includes("bookwalker")) return "BookWalker";
+      if (host.includes("amazon.") || host.includes("amzn.") || host.includes("kindle") || host.includes("read.amazon")) return "Amazon";
+      if (host.includes("kobo")) return "Kobo";
+      if (host.includes("play.google.com") || host.includes("books.google")) return "Google Books";
+      if (host.includes("apple.com") && host.includes("books")) return "Apple Books";
+      return "Link";
+    }
+
+
+    function normaliseUrl(raw){
+      const s = (raw || "").trim();
+      if (!s) return "";
+      // Allow users to paste without scheme
+      if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(s)) return s;
+      return "https://" + s;
+    }
+
+    function getAllLinks(){
+      const arr = Array.isArray(settings.links) ? settings.links : [];
+      const out = [];
+      for (const l of arr){
+        if (!l || typeof l !== "object") continue;
+
+        const id = (typeof l.id === "string" && l.id.trim()) ? l.id : makeId();
+
+        const baseTitle = (typeof l.title === "string" && l.title.trim()) ? l.title.trim() : "Untitled link";
+        const disp = (typeof l.displayTitle === "string") ? l.displayTitle.trim() : "";
+        const shownTitle = disp ? disp : baseTitle;
+
+        const status = (l.status === "reading" || l.status === "future" || l.status === "finished") ? l.status : "future";
+        const percent = linkStatusToPercent(status);
+
+        const series = (typeof l.series === "string") ? l.series.trim() : "";
+        const sn = (typeof l.seriesNumber === "number" && Number.isFinite(l.seriesNumber)) ? l.seriesNumber : null;
+
+        const imageUrl = (typeof l.imageUrl === "string" && l.imageUrl.trim()) ? normaliseUrl(l.imageUrl.trim()) : "";
+        const imageData = (typeof l.imageData === "string") ? l.imageData : "";
+        const coverUrl = imageUrl || imageData || "";
+
+        out.push({
+          kind: "link",
+          id,
+          path: `link:${id}`,
+          key: `link:${id}`,
+          title: baseTitle,
+          displayTitle: disp || shownTitle,
+          url: (typeof l.url === "string") ? l.url : "",
+          openType: (typeof l.openType === "string" && l.openType === "local") ? "local" : "web",
+          localFileId: (typeof l.localFileId === "string") ? l.localFileId : "",
+          localFileName: (typeof l.localFileName === "string") ? l.localFileName : "",
+          localFileType: (typeof l.localFileType === "string") ? l.localFileType : "",
+          coverUrl: coverUrl,
+          currentPage: percent,
+          totalPages: 100,
+          remainingPages: 0,
+          percentComplete: percent,
+          status,
+          tags: Array.isArray(l.tags) ? l.tags.map(t => (t||"").trim()).filter(Boolean) : [],
+          starred: (l.starred === true),
+          notCurrentlyReading: (l.notCurrentlyReading === true),
+          series,
+          seriesNumber: sn
+        });
+      }
+
+      // Ensure ids are unique and stored back if we had to generate any
+      // (keeps things stable across reloads)
+      let touched = false;
+      const seen = new Set();
+      for (const l of arr){
+        if (!l || typeof l !== "object") continue;
+        if (!l.id || typeof l.id !== "string" || !l.id.trim()){
+          l.id = makeId(); touched = true;
+        }
+        if (seen.has(l.id)){
+          l.id = makeId(); touched = true;
+        }
+        seen.add(l.id);
+      }
+      if (touched) saveSettings();
+
+      return out;
+    }
+
+    function normalise(s){ return (s || "").toLowerCase(); }
+
+    // ----------------------------
+    // UI state
+    // ----------------------------
+    let settings = loadSettings();
+    let books = [];
+    let selectedSeries = null; // string
+    let activeTagFiltersDraft = new Set(settings.ui.activeTagFilters || []);
+
+    // ----------------------------
+    // DOM helpers
+    // ----------------------------
+    const $ = (sel) => document.querySelector(sel);
+
+
+// Cover background helper (for the blurred "full cover" backdrop)
+function setCoverBgFromImg(topEl, imgEl){
+  try{
+    if (!topEl || !imgEl) return;
+    const src = imgEl.currentSrc || imgEl.src || "";
+    if (!src) return;
+    // Escape quotes to keep CSS valid
+    const safe = src.replace(/"/g, '\"');
+    topEl.style.setProperty("--coverBg", `url("${safe}")`);
+  } catch(e){}
+}
+
+
+    function clampInt(v, min, max, fallback){
+      const n = parseInt(v, 10);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.max(min, Math.min(max, n));
+    }
+
+    function clampNum(v, min, max, fallback){
+      const n = Number(v);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.max(min, Math.min(max, n));
+    }
+
+    function hexToRgba(hex, alpha){
+      const fallback = `rgba(142,197,255,${alpha})`;
+      if (typeof hex !== "string") return fallback;
+      let h = hex.trim().replace("#","");
+      if (h.length === 3){
+        h = h.split("").map(ch => ch + ch).join("");
+      }
+      if (h.length !== 6 || /[^0-9a-f]/i.test(h)) return fallback;
+      const r = parseInt(h.slice(0,2), 16);
+      const g = parseInt(h.slice(2,4), 16);
+      const b = parseInt(h.slice(4,6), 16);
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+
+
+    function escapeHTML(str){
+      return (str || "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+    }
+
+    function uniqueSorted(arr){
+      return Array.from(new Set(arr)).sort((a,b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+    }
+
+    // ----------------------------
+    // Filtering
+    // ----------------------------
+    function matchesTagFilters(book){
+      const active = settings.ui.activeTagFilters || [];
+      if (!active.length) return true;
+      const tagSet = new Set(book.tags.map(normalise));
+      return active.every(t => tagSet.has(normalise(t)));
+    }
+
+    function matchesSearch(book){
+      const q = normalise(settings.ui.search || "");
+      if (!q) return true;
+      const hay = [
+        book.title,
+        book.displayTitle,
+        book.series,
+        ...(book.tags || [])
+      ].filter(Boolean).map(normalise).join(" ");
+      return hay.includes(q);
+    }
+
+    
+    function applyHomeCols(){
+      const hc = (settings.ui && settings.ui.homeCols) ? settings.ui.homeCols : {};
+      for (const shelf of ["reading","starred","future","finished"]){
+        const cols = clampInt(hc[shelf], 1, 12, 5);
+        const panel = document.querySelector(`.shelf-panel[data-shelf="${shelf}"]`);
+        if (panel){
+          panel.style.setProperty("--cols", String(cols));
+          const scale = clampNum(5 / cols, 0.55, 1.85, 1);
+          panel.style.setProperty("--tileScale", String(scale));
+
+          // Shrink card height a bit more as columns increase (keeps the layout but avoids super-tall cards at high density)
+          const tileH = clampNum(34 - cols * 1.6, 16, 26, 26);      // em
+          const coverH = clampNum(18 - cols * 0.4, 10, 16, 16);     // em
+          const gridGap = clampNum(14 - cols * 0.4, 8, 12, 12);     // px
+          const bodyPad = clampNum(0.78 - (cols - 5) * 0.03, 0.45, 0.78, 0.72); // em
+          const bodyGap = clampNum(0.60 - (cols - 5) * 0.02, 0.35, 0.60, 0.55); // em
+
+          panel.style.setProperty("--tileH", `${tileH}em`);
+          panel.style.setProperty("--coverH", `${coverH}em`);
+          panel.style.setProperty("--gridGap", `${gridGap}px`);
+          panel.style.setProperty("--bodyPad", `${bodyPad}em`);
+          panel.style.setProperty("--bodyGap", `${bodyGap}em`);
+          // Progress bar compaction when many items per row
+          const progH = clampNum(16 - (cols - 5) * 1.15, 7, 14, 14); // px
+          panel.style.setProperty("--progH", `${progH}px`);
+
+          const compactProg = cols >= 9;
+          panel.classList.toggle("compact-progress", compactProg);
+
+          // Only show progress tooltip when compacted (progress text hidden)
+          for (const po of panel.querySelectorAll(".progress-overlay")){
+            // Keep tooltips only when compact progress is enabled
+            if (!compactProg){
+              po.removeAttribute("title");
+            }
+          }
+
+          // Section count pill colours
+          const pc = (settings.ui && settings.ui.sectionPillColors) ? settings.ui.sectionPillColors[shelf] : null;
+          if (pc){
+            panel.style.setProperty("--pillBg", hexToRgba(pc, 0.20));
+            panel.style.setProperty("--pillBd", hexToRgba(pc, 0.42));
+          panel.style.setProperty("--pillHex", pc);
+            panel.style.setProperty("--accent", pc);
+            }
+
+        }
+        const val = document.querySelector(`.cols-val[data-shelf-cols-val="${shelf}"]`);
+        if (val) val.textContent = String(cols);
+        }
+    }
+
+    function stepCols(current, dir){
+      // Keep it simple but flexible
+      const MIN = 1, MAX = 12;
+      let n = clampInt(current, MIN, MAX, 5) + dir;
+      if (n > MAX) n = MIN;
+      if (n < MIN) n = MAX;
+      return n;
+    }
+function visibleBooks(){
+      return books.filter(b => matchesTagFilters(b) && matchesSearch(b));
+    }
+
+    // ----------------------------
+    // Render: chips
+    // ----------------------------
+    function renderTagChips(container, tags){
+      container.innerHTML = "";
+      if (!tags || !tags.length){
+        const chip = document.createElement("div");
+        chip.className = "chip muted";
+        chip.textContent = "No tags";
+        container.appendChild(chip);
+        return;
+      }
+      for (const t of tags){
+        const chip = document.createElement("div");
+        chip.className = "chip";
+        chip.textContent = t;
+        container.appendChild(chip);
+      }
+    }
+
+
+    function wireTagHover(card, tags){
+      const hover = card.querySelector(".tag-hover");
+      if (!hover) return;
+      const icon = hover.querySelector(".tag-icon");
+      const pop = hover.querySelector(".tag-pop");
+
+      const hasTags = Array.isArray(tags) && tags.map(t=>String(t||"").trim()).filter(Boolean).length > 0;
+      if (!hasTags){
+        hover.style.display = "none";
+        return;
+      }
+      hover.style.display = "flex";
+      renderTagChips(pop, tags);
+
+      // Prevent opening the book/series when interacting with tags
+      const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+      ["click","mousedown","mouseup","touchstart","touchend"].forEach(ev=>{
+        hover.addEventListener(ev, stop, { passive:false });
+      });
+
+      // Mobile/touch: tap to toggle
+      icon.addEventListener("click", (e)=>{
+        e.preventDefault(); e.stopPropagation();
+        hover.classList.toggle("open");
+      }, { passive:false });
+    }
+
+
+    // ----------------------------
+    // Render: book card
+    // ----------------------------
+    function createBookCard(book, opts){
+      const options = opts || {};
+      const tpl = document.getElementById("book-card-template").content.cloneNode(true);
+      const card = tpl.querySelector(".book-card");
+      card.dataset.path = book.path;
+      card.dataset.key = book.key;
+
+      const img = card.querySelector("img");
+      img.src = book.coverUrl;
+      img.loading = "lazy";
+
+      // Blurred backdrop behind the cover (keeps grid tidy without heavy cropping)
+      const topEl = card.querySelector(".book-top");
+      setCoverBgFromImg(topEl, img);
+      img.addEventListener("load", () => setCoverBgFromImg(topEl, img));
+
+      // Series page: keep full cover (no cropping) without letterbox bars.
+      // We set the wrapper's aspect-ratio to the image's natural ratio once it loads.
+      if (options.seriesView === true){
+        const top = card.querySelector('.book-top');
+        if (top){
+          const setAR = () => {
+            const w = img.naturalWidth || 0;
+            const h = img.naturalHeight || 0;
+            if (w > 0 && h > 0) top.style.setProperty('--coverAR', `${w} / ${h}`);
+          };
+          if (img.complete) setAR();
+          img.addEventListener('load', setAR, { once:false });
+        }
+      }
+
+      card.querySelector(".book-title").textContent = (book.displayTitle || book.title);
+
+            const sub = card.querySelector(".book-sub");
+      sub.style.display = "";
+      sub.textContent = "Book 1/1";
+
+      const sub2 = card.querySelector(".book-sub2");
+      if (sub2){ sub2.style.display = "none"; sub2.textContent = ""; }
+
+      const fill = card.querySelector(".progress-fill");
+      fill.style.width = `${book.percentComplete}%`;
+
+      const pctEl = card.querySelector(".progress-pct");
+      if (pctEl) pctEl.textContent = `${Math.round(book.percentComplete)}%`;
+
+      const po = card.querySelector(".progress-overlay");
+      if (po) po.title = `${Math.round(book.percentComplete)}% • ${book.currentPage}/${book.totalPages}`;
+
+      wireTagHover(card, book.tags);
+const openA = card.querySelector('[data-action="open"]');
+      openA.href = book.path;
+
+      // Star
+      const starBtn = card.querySelector('[data-action="star"]');
+      if (starBtn){
+        const starred = (book.starred === true);
+        starBtn.textContent = starred ? "★" : "☆";
+        starBtn.classList.toggle("is-starred", starred);
+        const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+        ["click","mousedown","mouseup","touchstart","touchend"].forEach(ev => starBtn.addEventListener(ev, stop, { passive:false }));
+        starBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const m = ensureMeta(book.path);
+          m.starred = !(m.starred === true);
+          saveSettings();
+          refreshBooks();
+          route();
+        });
+      }
+
+      // Actions toggle (small low-opacity button that reveals the icon strip)
+      const actionsToggle = card.querySelector(".tile-actions-toggle");
+      if (actionsToggle){
+        const stop = (e)=>{ e.preventDefault(); e.stopPropagation(); };
+        ["mousedown","mouseup","touchstart","touchend"].forEach(ev => actionsToggle.addEventListener(ev, stop, { passive:false }));
+        actionsToggle.addEventListener("click", (e)=>{
+          e.preventDefault();
+          e.stopPropagation();
+          card.classList.toggle("actions-open");
+        }, { passive:false });
+
+        // Close the strip when you move off the tile (keeps the UI neat)
+        card.addEventListener("mouseleave", ()=> card.classList.remove("actions-open"));
+      }
+
+
+      // Stop the overlay link from eating button clicks
+      card.querySelectorAll(".icon-btn").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const action = btn.dataset.action;
+          if (action === "edit") openEditBookModal(book.path);
+          if (action === "remove") removeBookFromShelf(book.key);
+        });
+      });
+
+      return card;
+    }
+
+
+    // ----------------------------
+    // Render: external link card
+    // ----------------------------
+    function findLinkById(id){
+      const arr = Array.isArray(settings.links) ? settings.links : [];
+      return arr.find(x => x && typeof x === "object" && x.id === id) || null;
+    }
+
+    function removeLinkById(id){
+      const arr = Array.isArray(settings.links) ? settings.links : [];
+      const idx = arr.findIndex(x => x && typeof x === "object" && x.id === id);
+      if (idx >= 0){
+        const removed = arr[idx];
+        arr.splice(idx, 1);
+        settings.links = arr;
+        saveSettings();
+
+        // Clean up stored local file blob (best-effort)
+        if (removed && removed.openType === "local" && typeof removed.localFileId === "string" && removed.localFileId){
+          idbDeleteLocalFile(removed.localFileId).catch(err => console.warn("Failed to delete local file blob", err));
+        }
+      }
+    }
+
+
+    function createLinkCard(link, opts){
+      const options = opts || {};
+      const tpl = document.getElementById("book-card-template").content.cloneNode(true);
+      const card = tpl.querySelector(".book-card");
+      card.classList.add("link-card");
+      card.dataset.path = link.path;
+      card.dataset.key = link.key;
+
+      const top = card.querySelector(".book-top");
+
+      // Cover image
+      const img = card.querySelector("img");
+      if (link.coverUrl){
+        img.src = link.coverUrl;
+        img.loading = "lazy";
+        img.style.display = "";
+
+        setCoverBgFromImg(top, img);
+        img.addEventListener("load", () => setCoverBgFromImg(top, img));
+
+        if (options.seriesView === true){
+          const setAR = () => {
+            try {
+              if (img.naturalWidth && img.naturalHeight){
+                top.style.setProperty("--coverAR", `${img.naturalWidth}/${img.naturalHeight}`);
+              }
+            } catch (e) {}
+          };
+          if (img.complete) setAR();
+          img.addEventListener("load", setAR, { once: true });
+        }
+      } else {
+        // Simple fallback visual
+        img.removeAttribute("src");
+        img.style.display = "none";
+        top.style.background = "linear-gradient(135deg, rgba(105,180,255,.20), rgba(177,140,255,.16), rgba(103,224,163,.12))";
+      }
+
+      // Title
+      card.querySelector(".book-title").textContent = link.displayTitle || link.title || "Untitled link";
+
+      // Sub rows: keep consistent with normal books (series line only)
+      const sub = card.querySelector(".book-sub");
+      sub.style.display = "none";
+      sub.textContent = "";
+
+      const sub2 = card.querySelector(".book-sub2");
+      if (sub2){ sub2.style.display = "none"; sub2.textContent = ""; }
+
+      // Progress / state
+      const fill = card.querySelector(".progress-fill");
+      fill.style.width = `${link.percentComplete}%`;
+
+      const provider = (link.openType === "local") ? "Local file" : linkProviderLabel(link.url);
+      const pctText = `${Math.round(link.percentComplete)}%`;
+
+      const pctEl = card.querySelector(".progress-pct");
+      if (pctEl) pctEl.textContent = pctText;
+
+      const po = card.querySelector(".progress-overlay");
+      if (po){
+        po.title = provider ? `${pctText} • ${provider}` : pctText;
+      }
+
+// Tags hover
+      wireTagHover(card, link.tags);
+
+      
+      // Open: web link or local file
+      const openA = card.querySelector('[data-action="open"]');
+      if (link.openType === "local"){
+        openA.href = "#";
+        openA.removeAttribute("target");
+        openA.removeAttribute("rel");
+        openA.setAttribute("aria-label", "Open local file");
+        openA.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openLocalFileById(link.localFileId);
+        });
+      } else {
+        openA.href = normaliseUrl(link.url || "");
+        openA.target = "_blank";
+        openA.rel = "noopener noreferrer";
+        openA.setAttribute("aria-label", "Open link");
+      }
+// Reading toggle (hover-only): Future shows ✓, Reading shows ✕, Finished hides.
+      const tick = document.createElement("button");
+      tick.type = "button";
+      tick.className = "reading-tick";
+      const st = (link.status==="reading"||link.status==="future"||link.status==="finished") ? link.status : "future";
+      if (st === "finished"){
+        // do not show toggle for finished items
+      } else {
+        const isReading = (st === "reading");
+        tick.textContent = isReading ? "✕" : "✓";
+        tick.classList.toggle("is-remove", isReading);
+        tick.classList.toggle("is-add", !isReading);
+        tick.dataset.tip = isReading ? "Remove from reading" : "Move to Reading";
+        tick.title = tick.dataset.tip;
+        top.appendChild(tick);
+      }
+      const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+
+      if (st !== "finished"){
+        ["click","mousedown","mouseup","touchstart","touchend"].forEach(ev => tick.addEventListener(ev, stop, { passive:false }));
+        tick.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const item = findLinkById(link.id);
+          if (!item) return;
+          if (item.status === "finished") return;
+          item.status = (item.status === "reading") ? "future" : "reading";
+          // Update toggle visuals immediately (in case route is slow)
+          const isReadingNow = (item.status === "reading");
+          tick.textContent = isReadingNow ? "✕" : "✓";
+          tick.classList.toggle("is-remove", isReadingNow);
+          tick.classList.toggle("is-add", !isReadingNow);
+          tick.dataset.tip = isReadingNow ? "Remove from reading" : "Move to Reading";
+          tick.title = tick.dataset.tip;
+
+          saveSettings();
+          refreshBooks();
+          route();
+        });
+      }
+
+      // Star
+      const starBtn = card.querySelector('[data-action="star"]');
+      if (starBtn){
+        const l = findLinkById(link.id);
+        const starred = (l && l.starred === true);
+        starBtn.textContent = starred ? "★" : "☆";
+        starBtn.classList.toggle("is-starred", starred);
+        ["click","mousedown","mouseup","touchstart","touchend"].forEach(ev => starBtn.addEventListener(ev, stop, { passive:false }));
+        starBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const item = findLinkById(link.id);
+          if (!item) return;
+          item.starred = !(item.starred === true);
+          saveSettings();
+          refreshBooks();
+          route();
+        });
+      }
+
+      // Actions
+      const actions = card.querySelector(".book-actions");
+      if (actions){
+        const editBtn = actions.querySelector('[data-action="edit"]');
+        const remBtn = actions.querySelector('[data-action="remove"]');
+        if (editBtn){
+          editBtn.title = "Edit link";
+          ["click","mousedown","mouseup","touchstart","touchend"].forEach(ev => editBtn.addEventListener(ev, stop, { passive:false }));
+          editBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openEditLinkModal(link.id);
+          });
+        }
+        if (remBtn){
+          remBtn.title = "Delete link tile";
+          ["click","mousedown","mouseup","touchstart","touchend"].forEach(ev => remBtn.addEventListener(ev, stop, { passive:false }));
+          remBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const ok = confirm("Delete this link tile? (This only removes it from Bookshelf.)");
+            if (!ok) return;
+            removeLinkById(link.id);
+            refreshBooks();
+            route();
+          });
+        }
+      }
+
+      return card;
+    }
+
+    // ----------------------------
+    // Render: series card
+    // ----------------------------
+    function createSeriesCard(seriesName, seriesBooks){
+      const tpl = document.getElementById("series-card-template").content.cloneNode(true);
+      const card = tpl.querySelector(".series-card");
+      card.dataset.series = seriesName;
+
+      const imgs = Array.from(tpl.querySelectorAll("img"));
+      const covers = seriesBooks.slice(0,4).map(b => b.coverUrl);
+            const coversWrap = tpl.querySelector(".series-covers");
+      coversWrap.dataset.count = String(covers.filter(Boolean).length || 0);
+for (let i=0;i<imgs.length;i++){
+        if (covers[i]){
+          imgs[i].src = covers[i];
+          imgs[i].loading = "lazy";
+        } else {
+          imgs[i].style.display = "none";
+        }
+      }
+
+      tpl.querySelector(".series-name").textContent = seriesName;
+
+      const reading = seriesBooks.filter(b => b.status==="reading").length;
+      const future = seriesBooks.filter(b => b.status==="future").length;
+      const finished = seriesBooks.filter(b => b.status==="finished").length;
+
+      tpl.querySelector(".series-sub").textContent =
+        `${seriesBooks.length} book${seriesBooks.length===1?"":"s"} • ${reading} reading • ${future} future • ${finished} finished`;
+
+      // Make a compact tag summary (top tags)
+      const allTags = seriesBooks.flatMap(b => b.tags || []).map(t => t.trim()).filter(Boolean);
+      const freq = new Map();
+      for (const t of allTags) freq.set(t, (freq.get(t) || 0) + 1);
+      const topTags = Array.from(freq.entries()).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([t])=>t);
+
+      const tagsWrap = tpl.querySelector(".series-tags");
+      tagsWrap.innerHTML = "";
+      for (const t of topTags){
+        const chip = document.createElement("div");
+        chip.className = "chip";
+        chip.textContent = t;
+        tagsWrap.appendChild(chip);
+      }
+      if (!topTags.length){
+        const chip = document.createElement("div");
+        chip.className = "chip muted";
+        chip.textContent = "No tags";
+        tagsWrap.appendChild(chip);
+      }
+
+      card.addEventListener("click", () => {
+        location.hash = `#series=${encodeURIComponent(seriesName)}`;
+      });
+
+      return card;
+    }
+
+    
+function createSeriesGroupCard(seriesName, seriesBooks, opts={}){
+  const mode = (opts && typeof opts === "object" && opts.mode) ? opts.mode : "normal";
+  const tpl = document.getElementById("book-card-template").content.cloneNode(true);
+  const card = tpl.querySelector(".book-card");
+  card.classList.add("series-tile");
+  card.dataset.series = seriesName;
+
+  // Choose the "current" book:
+  // 1) Alphabetically first Reading (started but not complete)
+  // 2) Else alphabetically first Finished (started and complete)
+  // 3) Else alphabetically first not finished (unread/future)
+  // 4) Else alphabetically first
+  const sorted = seriesBooks.slice().sort((a,b)=>{
+    const an = (typeof a.seriesNumber === "number" && Number.isFinite(a.seriesNumber)) ? a.seriesNumber : null;
+    const bn = (typeof b.seriesNumber === "number" && Number.isFinite(b.seriesNumber)) ? b.seriesNumber : null;
+    if (an !== null && bn !== null) return an - bn;
+    if (an !== null && bn === null) return -1;
+    if (an === null && bn !== null) return 1;
+    return a.title.localeCompare(b.title, undefined, { sensitivity:"base"});
+  });
+    let currentBook = null;
+  if (mode === "finished"){
+    for (let i = sorted.length - 1; i >= 0; i--){
+      if (sorted[i].status === "finished"){ currentBook = sorted[i]; break; }
+    }
+  }
+  if (!currentBook){
+    currentBook =
+      sorted.find(b => b.status === "reading") ||
+      sorted.find(b => b.status === "finished") ||
+      sorted.find(b => b.status !== "finished") ||
+      sorted[0];
+  }
+  // Cover: show the current book's cover (the book you're up to)
+  const top = card.querySelector(".book-top");
+  const img = top.querySelector("img");
+  if (img){
+    if (currentBook && currentBook.coverUrl){
+      img.src = currentBook.coverUrl;
+      img.loading = "lazy";
+      img.style.display = "";
+
+      setCoverBgFromImg(top, img);
+      img.addEventListener("load", () => setCoverBgFromImg(top, img));
+    } else {
+      img.style.display = "none";
+    }
+  }
+
+  const total = seriesBooks.length;
+
+  // Title row: series title
+  card.querySelector(".book-title").textContent = seriesName;
+
+  // Second row: started summary
+    const startedCount = seriesBooks.filter(b => b.status !== "future").length; // reading or finished
+    const finishedCount = seriesBooks.filter(b => b.status === "finished").length;
+
+    let line2 = "";
+
+    // Determine which book number you're up to in the series (1-based)
+    let idx = -1;
+
+    const readingIdx = (currentBook && currentBook.status === "reading")
+      ? sorted.findIndex(b => b.key === currentBook.key)
+      : sorted.findIndex(b => b.status === "reading");
+
+    if (finishedCount === total){
+      idx = total - 1;
+    } else if (readingIdx >= 0){
+      idx = readingIdx;
+    } else if (finishedCount > 0){
+      // Latest finished book in order
+      for (let i = sorted.length - 1; i >= 0; i--){
+        if (sorted[i].status === "finished"){ idx = i; break; }
+      }
+    } else if (startedCount === 0){
+      idx = -1;
+    }
+
+    const shown = (idx >= 0) ? (idx + 1) : 0;
+    if (mode === "finished"){
+    line2 = `Book ${finishedCount}/${total}`;
+  } else {
+    line2 = `Book ${shown}/${total}`;
+  }
+
+    // Second row: started summary
+  const sub = card.querySelector(".book-sub");
+  sub.textContent = line2;
+
+  // Third row: page count line (for current book)
+  const sub2 = card.querySelector(".book-sub2");
+  if (sub2){
+    sub2.style.display = "none";
+    sub2.textContent = "";
+  }
+
+  // Progress (for current book)
+  const fill = card.querySelector(".progress-fill");
+  fill.style.width = `${currentBook.percentComplete}%`;
+
+  const pctText = `${Math.round(currentBook.percentComplete)}%`;
+  const pctEl = card.querySelector(".progress-pct");
+  if (pctEl) pctEl.textContent = pctText;
+
+  let detail = "";
+  if (currentBook && currentBook.kind === "link"){
+    const prov = linkProviderLabel(currentBook.url);
+    detail = prov ? ` • ${prov}` : "";
+  } else if (currentBook){
+    detail = ` • ${currentBook.currentPage}/${currentBook.totalPages}`;
+  }
+
+  const po = card.querySelector(".progress-overlay");
+  if (po) po.title = `${pctText}${detail}`;
+
+
+
+  // Tags: show tags for the current book
+  wireTagHover(card, currentBook.tags);
+// Open series page
+  const openA = card.querySelector('[data-action="open"]');
+  openA.href = `#series=${encodeURIComponent(seriesName)}`;
+
+  // Star (series-level)
+  const starBtn = card.querySelector('[data-action="star"]');
+  if (starBtn){
+    const sm = getSeriesMeta(seriesName);
+    const starred = (sm.starred === true) || seriesBooks.some(b=>b.starred===true);
+    starBtn.textContent = starred ? "★" : "☆";
+    starBtn.classList.toggle("is-starred", starred);
+    const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+    ["click","mousedown","mouseup","touchstart","touchend"].forEach(ev => starBtn.addEventListener(ev, stop, { passive:false }));
+    starBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const cur = ensureSeriesMeta(seriesName);
+      cur.starred = !(cur.starred === true);
+      saveSettings();
+      refreshBooks();
+      route();
+    });
+  }
+
+  openA.setAttribute("aria-label", "Open series");
+
+  // Wire the icon strip for series tiles
+  card.querySelectorAll(".icon-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const action = btn.dataset.action;
+      if (action === "edit"){
+        window.location.hash = `#series=${encodeURIComponent(seriesName)}`;
+        route();
+      }
+      if (action === "remove"){
+        removeSeriesFromShelf(seriesName, seriesBooks);
+      }
+    }, { passive:false });
+  });
+
+  // Actions toggle (small low-opacity button that reveals the icon strip)
+  const actionsToggle = card.querySelector(".tile-actions-toggle");
+  if (actionsToggle){
+    const stop = (e)=>{ e.preventDefault(); e.stopPropagation(); };
+    ["mousedown","mouseup","touchstart","touchend"].forEach(ev => actionsToggle.addEventListener(ev, stop, { passive:false }));
+    actionsToggle.addEventListener("click", (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      card.classList.toggle("actions-open");
+    }, { passive:false });
+
+    // Close the strip when you move off the tile (keeps the UI neat)
+    card.addEventListener("mouseleave", ()=> card.classList.remove("actions-open"));
+  }
+
+  return card;
+}
+
+    // ----------------------------
+    // Render pages
+    // ----------------------------
+    function renderHome(){
+      const all = visibleBooks();
+
+      $("#subtitle").textContent = `${books.length} tracked • ${all.length} shown`;
+
+      // Home section toggles / filters
+      const starredPanel = document.querySelector('.shelf-panel[data-shelf="starred"]');
+      if (starredPanel) starredPanel.style.display = (settings.ui.showStarredSection === false) ? "none" : "";
+
+      const libToggle = $("#libraryShowAllToggle");
+      if (libToggle) libToggle.checked = (settings.ui.libraryShowAll === true);
+
+
+      // All books by status (with series grouped into a single tile)
+      renderStatusGrids(all, {
+        reading: $("#readingGrid"),
+        starred: $("#starredGrid"),
+        future: $("#futureGrid"),
+        finished: $("#finishedGrid"),
+        readingPill: $("#readingCountPill"),
+        starredPill: $("#starredCountPill"),
+        futurePill: $("#futureCountPill"),
+        finishedPill: $("#finishedCountPill")
+      });
+
+      // Tag filter panel
+      renderTagFilterPanel();
+    }
+
+    
+function renderStatusGrids(bookList, refs){
+  const norm = (s) => (s==="reading"||s==="future"||s==="finished") ? s : "future";
+  // Section count pills are set later using the final tile lists (after series grouping and “not currently reading” rules).
+
+  // Build series groups across ALL visible books, then place each series tile into ONE shelf:
+  // - If any book is Reading => series tile appears in Reading
+  // - Else if any book is Unread/Future => appears in Future
+  // - Else => Finished
+  const seriesMap = new Map();
+  const singles = { reading: [], future: [], finished: [], starred: [] };
+
+  for (const b of bookList){
+    const s = (b.series || "").trim();
+    if (s){
+      if (!seriesMap.has(s)) seriesMap.set(s, []);
+      seriesMap.get(s).push(b);
+    } else {
+      let st = norm(b.status);
+      if (st === "reading" && b.notCurrentlyReading === true) st = "future";
+      singles[st].push(b);
+    }
+  }
+
+  const itemsByStatus = {
+    reading: [],
+    starred: [],
+    future: [],
+    finished: []
+  };
+
+  // Add single books (starred items get pulled into their own shelf)
+  for (const st of ["reading","starred","future","finished"]){
+    for (const b of (singles[st] || [])){
+      const itemType = (b.kind === "link") ? "link" : "book";
+      const item = { type: itemType, key: (b.displayTitle || b.title), book: b };
+      itemsByStatus[st].push(item);
+      if (b.starred === true) itemsByStatus.starred.push(item);
+    }
+  }
+
+  // Add series tiles
+  for (const [name, arr] of seriesMap.entries()){
+    const statuses = arr.map(b => norm(b.status));
+    const total = statuses.length;
+    const finishedCount = statuses.filter(s => s === "finished").length;
+    const startedCount = statuses.filter(s => s !== "future").length; // reading or finished
+
+    // Series shelf rules:
+    // - Finished only if ALL books are finished
+    // - Reading if ANY book has been started (reading OR finished) but the series isn't fully finished
+    // - Future only if NONE have been started
+    const shelf =
+      (finishedCount === total) ? "finished" :
+      (startedCount > 0) ? "reading" :
+      "future";
+
+    const smeta = getSeriesMeta(name);
+    const shelfFinal = (smeta.notCurrentlyReading === true && shelf === "reading") ? "future" : shelf;
+
+    const seriesStarred = (smeta.starred === true) || arr.some(b => b.starred === true);
+    const seriesItem = { type:"series", key: name, books: arr };
+    itemsByStatus[shelfFinal].push(seriesItem);
+    if (seriesStarred) itemsByStatus.starred.push(seriesItem);
+
+    // Also show partially-completed series in Finished (Finished = books finished, even if the series isn't complete)
+    if (finishedCount > 0 && finishedCount < total){
+      const partialFinishedSeriesItem = { type:"series", key: name, books: arr, mode:"finished" };
+      itemsByStatus.finished.push(partialFinishedSeriesItem);
+    }
+  }
+
+
+  // Library filter: when enabled, show ALL items (started + finished) in the Library shelf.
+  // This keeps the tidy sections but also gives you a single “everything” view.
+  if (settings.ui.libraryShowAll === true){
+    const lib = [];
+    const seen = new Set();
+
+    const pushUnique = (it) => {
+      let id = "";
+      if (it.type === "series"){
+        id = "series:" + it.key;
+      } else if (it.book && it.book.key){
+        id = "book:" + it.book.key;
+      } else if (it.book && it.book.id){
+        id = "link:" + it.book.id;
+      } else {
+        id = it.type + ":" + it.key;
+      }
+      if (seen.has(id)) return;
+      seen.add(id);
+      lib.push(it);
+    };
+
+    ["reading","future","finished"].forEach(st => (itemsByStatus[st] || []).forEach(pushUnique));
+    itemsByStatus.future = lib;
+  }
+
+
+  // Sort within each shelf
+    for (const st of ["reading","starred","future","finished"]){
+    itemsByStatus[st].sort((a,b)=>a.key.localeCompare(b.key, undefined, { sensitivity:"base" }));
+  }
+
+  if (refs.readingPill) refs.readingPill.textContent = `${itemsByStatus.reading.length}`;
+  if (refs.starredPill) refs.starredPill.textContent = `${itemsByStatus.starred.length}`;
+  if (refs.futurePill) refs.futurePill.textContent = `${itemsByStatus.future.length}`;
+  if (refs.finishedPill) refs.finishedPill.textContent = `${itemsByStatus.finished.length}`;
+
+  const renderShelf = (container, items, emptyText) => {
+    container.innerHTML = "";
+    if (!items.length){
+      container.appendChild(emptyState(emptyText));
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    for (const it of items){
+      if (it.type === "series"){
+        frag.appendChild(createSeriesGroupCard(it.key, it.books, { mode: it.mode }));
+      } else if (it.type === "link"){
+        frag.appendChild(createLinkCard(it.book));
+      } else {
+        frag.appendChild(createBookCard(it.book));
+      }
+    }
+    container.appendChild(frag);
+  };
+
+  renderShelf(refs.reading, itemsByStatus.reading, "Nothing currently in progress.");
+  renderShelf(refs.starred, itemsByStatus.starred, "Nothing starred yet.");
+  renderShelf(refs.future, itemsByStatus.future, "Nothing marked as unread.");
+  renderShelf(refs.finished, itemsByStatus.finished, "No finished books yet.");
+}
+
+    
+    function renderSeriesPage(seriesName){
+      const all = visibleBooks().filter(b => b.series === seriesName);
+
+      $("#seriesTitle").textContent = seriesName;
+      $("#seriesBookCountPill").textContent = `${all.length} book${all.length===1?"":"s"}`;
+
+      // Series options
+      const ncr = $("#seriesNotReadingChk");
+      if (ncr){
+        const meta = getSeriesMeta(seriesName);
+        ncr.checked = (meta.notCurrentlyReading === true);
+        ncr.onchange = () => {
+          if (!settings.seriesMeta || typeof settings.seriesMeta !== "object") settings.seriesMeta = {};
+          if (!settings.seriesMeta[seriesName] || typeof settings.seriesMeta[seriesName] !== "object") settings.seriesMeta[seriesName] = {};
+          settings.seriesMeta[seriesName].notCurrentlyReading = (ncr.checked === true);
+          saveSettings();
+        };
+      }
+
+
+      const grid = $("#seriesAllGrid");
+      grid.innerHTML = "";
+      if (!all.length){
+        grid.appendChild(emptyState("No books in this series."));
+        return;
+      }
+
+      const sorted = all.slice().sort((a,b)=>{
+        const an = (typeof a.seriesNumber === "number" && Number.isFinite(a.seriesNumber)) ? a.seriesNumber : null;
+        const bn = (typeof b.seriesNumber === "number" && Number.isFinite(b.seriesNumber)) ? b.seriesNumber : null;
+        if (an !== null && bn !== null) return an - bn;
+        if (an !== null && bn === null) return -1;
+        if (an === null && bn !== null) return 1;
+        return a.title.localeCompare(b.title, undefined, { sensitivity:"base" });
+      });
+      const frag = document.createDocumentFragment();
+      for (const b of sorted){
+        if (b.kind === "link"){
+          frag.appendChild(createLinkCard(b));
+        } else {
+          frag.appendChild(createBookCard(b));
+        }
+      }
+      grid.appendChild(frag);
+    }
+
+
+    function emptyState(text){
+      const div = document.createElement("div");
+      div.className = "empty";
+      div.textContent = text;
+      return div;
+    }
+
+    // ----------------------------
+    // Routing
+    // ----------------------------
+    function route(){
+      const hash = location.hash || "";
+      const match = hash.match(/^#series=(.+)$/);
+      if (match){
+        selectedSeries = decodeURIComponent(match[1]);
+        $("#homePage").classList.add("hidden");
+        $("#seriesPage").classList.remove("hidden");
+        renderSeriesPage(selectedSeries);
+      } else {
+        selectedSeries = null;
+        $("#seriesPage").classList.add("hidden");
+        $("#homePage").classList.remove("hidden");
+        renderHome();
+      }
+      closeTagFilterPanel();
+    }
+
+    // ----------------------------
+    // Book updates from storage changes
+    // ----------------------------
+    window.addEventListener("storage", (event) => {
+      if (!event.key || !event.key.startsWith(STORAGE_PREFIX)) return;
+      // Update in-memory model
+      refreshBooks(false);
+
+      // If we can, patch-update just the card that changed (smoother than full re-render).
+      // But because we have filters + series previews, simplest + reliable is to route-render.
+      route();
+    });
+
+    // ----------------------------
+    // Import / Export
+    // ----------------------------
+    function downloadJSON(filename, data){
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function exportSiteSettings(){
+      const payload = {
+        version: 3,
+        exportedAt: new Date().toISOString(),
+        settings: settings
+      };
+      downloadJSON(`bookshelf-settings-${new Date().toISOString().slice(0,10)}.json`, payload);
+    }
+
+    function importSiteSettingsFromFile(file){
+      const reader = new FileReader();
+      reader.onload = () => {
+        const payload = safeJSONParse(reader.result, null);
+        if (!payload || typeof payload !== "object"){
+          alert("That file doesn't look like JSON.");
+          return;
+        }
+        const incoming = payload.settings || payload; // allow raw settings too
+        if (!incoming || typeof incoming !== "object" || !(incoming.version===2 || incoming.version===3)){
+          alert("Unsupported settings file. Expected version 2 or 3.");
+          return;
+        }
+        settings = {
+          ...structuredClone(DEFAULT_SETTINGS),
+          ...incoming,
+          ui: { ...structuredClone(DEFAULT_SETTINGS.ui), ...(incoming.ui || {}) },
+          meta: { ...(incoming.meta || {}) },
+          seriesMeta: { ...(incoming.seriesMeta || {}) },
+          links: Array.isArray(incoming.links) ? incoming.links : []
+        };
+        if (settings.version === 2) settings.version = 3;
+        if (!settings.seriesMeta || typeof settings.seriesMeta !== "object") settings.seriesMeta = {};
+        saveSettings();
+        applyTheme();
+        $("#searchInput").value = settings.ui.search || "";
+        activeTagFiltersDraft = new Set(settings.ui.activeTagFilters || []);
+        refreshBooks();
+        route();
+      };
+      reader.readAsText(file);
+    }
+
+    // ----------------------------
+    // Modals
+    // ----------------------------
+    function openModal(title, bodyHTML, footerButtons){
+      $("#modalTitle").textContent = title;
+      $("#modalBody").innerHTML = bodyHTML;
+      const footer = $("#modalFooter");
+      footer.innerHTML = "";
+      for (const btn of footerButtons){
+        footer.appendChild(btn);
+      }
+      $("#modalBackdrop").classList.add("open");
+    }
+    function closeModal(){
+      $("#modalBackdrop").classList.remove("open");
+      $("#modalBody").innerHTML = "";
+      $("#modalFooter").innerHTML = "";
+    }
+
+    function makeBtn(label, cls, onClick){
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `btn ${cls||""}`.trim();
+      b.textContent = label;
+      b.addEventListener("click", onClick);
+      return b;
+    }
+
+    function openEditBookModal(path){
+      const book = books.find(b => b.path === path);
+      const meta = getMeta(path);
+
+      const allSeries = uniqueSorted(books.map(b => b.series).filter(Boolean));
+      const allTags = uniqueSorted(books.flatMap(b => b.tags || []).filter(Boolean));
+
+      const body = `
+        <div class="form">
+          <div class="row two">
+            <div>
+              <label>Title (read-only)</label>
+              <input class="field" value="${escapeHTML(book ? book.title : path)}" disabled />
+              <div class="help">The title is taken from the Mokuro HTML filename.</div>
+
+              <div style="height:10px;"></div>
+
+              <label>Display Title (optional)</label>
+              <input class="field" id="editDisplayTitleInput" value="${escapeHTML(meta.displayTitle || "")}" placeholder="Shown on cards instead of the filename title" />
+              <div class="help">Leave blank to show the filename title.</div>
+            </div>
+            <div>
+              <label>Series</label>
+              <input class="field" id="editSeriesInput" list="seriesList" value="${escapeHTML(meta.series || "")}" placeholder="e.g. Yotsuba&! or One Piece" />
+              <datalist id="seriesList">
+                ${allSeries.map(s => `<option value="${escapeHTML(s)}"></option>`).join("")}
+              </datalist>
+              <div class="help">Set this to group books into a folder-like view on the homepage.</div>
+
+              <div style="height:10px;"></div>
+
+              <label>Number in series (optional)</label>
+              <input class="field" id="editSeriesNumberInput" type="number" min="1" step="1" value="${(typeof meta.seriesNumber === "number" && Number.isFinite(meta.seriesNumber)) ? meta.seriesNumber : ""}" placeholder="e.g. 1" />
+              <div class="help">Used to order books inside a series page. If blank, books sort alphabetically by filename title.</div>
+            </div>
+          </div>
+
+          <div>
+            <label>Tags</label>
+            <input class="field" id="editTagsInput" value="${escapeHTML((meta.tags||[]).join(", "))}" placeholder="comma-separated, e.g. japanese, srs, favourites" />
+            <div class="help">Use commas. Tags are used for filtering and also show on series cards.</div>
+          </div>
+          <div class="divider"></div>
+
+          <div class="row two">
+            <div>
+              <label>Quick tag suggestions</label>
+              <div class="chips" style="margin-top:6px;">
+                ${
+                  (allTags.slice(0,24).map(t => `<div class="chip" data-suggest-tag="${escapeHTML(t)}" style="cursor:pointer;">${escapeHTML(t)}</div>`).join(""))
+                  || `<div class="chip muted">No tags yet</div>`
+                }
+              </div>
+              <div class="help">Click a tag to add it.</div>
+            </div>
+            <div>
+              <label>Actions</label>
+              <div class="help">This only changes the shelf metadata stored in localStorage (not your files).</div>
+
+              <label class="checkpill" style="margin-top:10px;" title="Move this book out of Reading and into Future (Unread) on the main page.">
+                <input type="checkbox" id="editNotReadingChk">Not currently reading
+              </label>
+
+              <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn danger" id="clearMetaBtn" type="button">Clear tags + series</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const save = makeBtn("Save", "primary", () => {
+        const seriesVal = ($("#editSeriesInput").value || "").trim();
+
+        const displayTitleVal = ($("#editDisplayTitleInput").value || "").trim();
+
+        const seriesNumRaw = ($("#editSeriesNumberInput").value || "").trim();
+        const seriesNumberVal = seriesNumRaw ? Number.parseInt(seriesNumRaw, 10) : null;
+        const safeSeriesNumber = (typeof seriesNumberVal === "number" && Number.isFinite(seriesNumberVal) && seriesNumberVal > 0) ? seriesNumberVal : null;
+
+        const tagsRaw = ($("#editTagsInput").value || "");
+        const tags = tagsRaw.split(",").map(s => s.trim()).filter(Boolean);
+
+        settings.meta[path] = {
+          ...ensureMeta(path),
+          series: seriesVal,
+          displayTitle: displayTitleVal,
+          seriesNumber: safeSeriesNumber,
+          tags: uniqueSorted(tags),
+          notCurrentlyReading: ((document.querySelector("#editNotReadingChk")||{}).checked === true)
+        };
+        saveSettings();
+        refreshBooks();
+        route();
+        closeModal();
+      });
+
+      const cancel = makeBtn("Cancel", "", closeModal);
+
+      openModal("Edit book", body, [cancel, save]);
+
+      // Not currently reading (single books only)
+      const ncr = document.querySelector("#editNotReadingChk");
+      const seriesInput = document.querySelector("#editSeriesInput");
+      if (ncr){
+        ncr.checked = (meta.notCurrentlyReading === true);
+        const syncNcrEnabled = () => {
+          const hasSeries = ((seriesInput && seriesInput.value) ? seriesInput.value.trim() : "") !== "";
+          ncr.disabled = hasSeries;
+          ncr.style.opacity = hasSeries ? "0.5" : "1";
+          if (hasSeries) ncr.checked = false;
+        };
+        if (seriesInput){
+          seriesInput.addEventListener("input", syncNcrEnabled);
+          seriesInput.addEventListener("change", syncNcrEnabled);
+        }
+        syncNcrEnabled();
+      }
+
+      // suggestion tag clicks + clear
+      $("#modalBody").querySelectorAll("[data-suggest-tag]").forEach(el => {
+        el.addEventListener("click", () => {
+          const tag = el.getAttribute("data-suggest-tag");
+          const input = $("#editTagsInput");
+          const current = input.value.split(",").map(s => s.trim()).filter(Boolean);
+          if (!current.map(normalise).includes(normalise(tag))) current.push(tag);
+          input.value = current.join(", ");
+        });
+      });
+
+      $("#clearMetaBtn").addEventListener("click", () => {
+        settings.meta[path] = { tags: [], series: "", displayTitle: "", seriesNumber: null, notCurrentlyReading: false };
+        saveSettings();
+        refreshBooks();
+        route();
+        closeModal();
+      });
+    }
+
+    function openAddLinkModal(){
+      const allSeries = uniqueSorted([
+        ...books.map(b => b.series),
+        ...((settings.links||[]).map(l => l.series))
+      ].filter(Boolean));
+
+      // Empty defaults so the template can safely reference these fields
+      const link = { displayTitle: "", series: "", seriesNumber: null, imageUrl: "" };
+
+      let pendingImageData = "";
+      let pendingImageUrl = "";
+      let pendingLocalFile = null;
+
+      const body = `
+        <div class="form">
+          <div class="row two">
+            <div>
+              <label>Title</label>
+              <input class="field" id="linkTitleInput" placeholder="e.g. One Piece (Kindle) — Vol 12" />
+              <div class="help">Shown on the tile.</div>
+
+              <div style="height:10px;"></div>
+
+              <label>Display Title</label>
+              <input class="field" id="linkDisplayTitleInput" value="${escapeHTML(link.displayTitle || "")}" placeholder="Optional – if set, shown instead of Title" />
+              <div class="help">If blank, the tile uses Title.</div>
+
+              <div style="height:10px;"></div>
+
+              <label>Series</label>
+              <input class="field" id="linkSeriesInput" list="seriesList" value="${escapeHTML(link.series || "")}" placeholder="Optional – e.g. The Expanse" />
+              <datalist id="seriesList">
+                ${allSeries.map(s => `<option value="${escapeHTML(s)}"></option>`).join("")}
+              </datalist>
+              <div class="help">Put this tile into a series (it will group on the main page).</div>
+
+              <div style="height:10px;"></div>
+
+              <label>Number in series</label>
+              <input class="field" id="linkSeriesNumberInput" value="${escapeHTML(link.seriesNumber!=null ? String(link.seriesNumber) : "")}" type="number" min="0" step="1" placeholder="Optional – e.g. 3" />
+              <div class="help">Used for ordering on the series page (otherwise alphabetical).</div>
+
+              <div style="height:10px;"></div>
+              <label>Open</label>
+              <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin-top:6px;">
+                <label style="display:flex; gap:8px; align-items:center; cursor:pointer;">
+                  <input type="radio" name="linkOpenType" value="web" checked />
+                  <span>Web link</span>
+                </label>
+                <label style="display:flex; gap:8px; align-items:center; cursor:pointer;">
+                  <input type="radio" name="linkOpenType" value="local" />
+                  <span>Local file</span>
+                </label>
+              </div>
+              <div class="help">Choose whether this tile opens a website or a file stored in this browser.</div>
+
+              <div style="height:10px;"></div>
+
+              <div id="linkWebFields">
+                <label>Web Address</label>
+                <input class="field" id="linkUrlInput" placeholder="https://..." />
+                <div class="help">This is what opens when you click the tile.</div>
+              </div>
+
+              <div id="linkLocalFields" style="display:none;">
+                <label>Local file</label>
+                <input class="field" id="linkLocalFileInput" type="file" />
+                <div class="help">The file is stored in this browser (IndexedDB). If you export/import settings on another device, you’ll need to re-add the file there.</div>
+                <div id="linkLocalFileInfo" class="help" style="margin-top:6px;"></div>
+              </div>
+
+              <div style="height:10px;"></div>
+<label>Status</label>
+              <select class="field" id="linkStatusSelect">
+                <option value="future">Not started</option>
+                <option value="reading">In progress</option>
+                <option value="finished">Finished</option>
+              </select>
+            </div>
+
+            <div>
+              <label>Cover image</label>
+              <input class="field" id="linkImageUrlInput" value="${escapeHTML(link.imageUrl || "")}" placeholder="Image URL (optional) — https://..." />
+              <div class="help">If set, this will be used instead of an uploaded image.</div>
+              <div style="height:10px;"></div>
+              <input class="field" id="linkImageInput" type="file" accept="image/*" />
+              <div class="help">Stored inside your settings as a data URL. Keep images reasonably small so localStorage doesn’t run out of space.</div>
+              <div style="height:10px;"></div>
+              <div id="linkImagePreviewWrap" style="border:1px solid rgba(255,255,255,.12); border-radius: 14px; overflow:hidden; background: rgba(255,255,255,.04);">
+                <div style="padding:10px; font-size:12px; color: rgba(255,255,255,.70);">No image selected</div>
+              </div>
+              <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn" id="linkClearImageBtn" type="button">Clear image</button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label>Tags</label>
+            <input class="field" id="linkTagsInput" placeholder="comma-separated, e.g. kindle, manga, wishlist" />
+            <div class="help">Optional.</div>
+          </div>
+        </div>
+      `;
+
+      const save = makeBtn("Add", "primary", async () => {
+        const originalLabel = save.textContent;
+        try{
+          save.disabled = true;
+          save.textContent = "Adding…";
+
+          const title = ($("#linkTitleInput").value || "").trim();
+          const displayTitle = ($("#linkDisplayTitleInput").value || "").trim();
+          const series = ($("#linkSeriesInput").value || "").trim();
+          const seriesNumRaw = ($("#linkSeriesNumberInput").value || "").trim();
+          const seriesNumber = seriesNumRaw ? (parseInt(seriesNumRaw, 10) || null) : null;
+
+          const openTypeEl = document.querySelector('input[name="linkOpenType"]:checked');
+          const openType = openTypeEl ? openTypeEl.value : "web";
+
+          const url = ($("#linkUrlInput").value || "").trim();
+          const imageUrlRaw = ($("#linkImageUrlInput").value || "").trim();
+          const imageUrl = imageUrlRaw ? normaliseUrl(imageUrlRaw) : "";
+          const status = ($("#linkStatusSelect").value || "future").trim();
+          const tagsRaw = ($("#linkTagsInput").value || "");
+          const tags = uniqueSorted(tagsRaw.split(",").map(s=>s.trim()).filter(Boolean));
+
+          if (!title){
+            alert("Please enter a title.");
+            return;
+          }
+
+          let localFileId = "";
+          let localFileName = "";
+          let localFileType = "";
+
+          if (openType === "local"){
+            if (!pendingLocalFile){
+              alert("Please choose a local file.");
+              return;
+            }
+
+            // Basic size sanity check (actual quota depends on browser/device)
+            const sizeMB = pendingLocalFile.size / (1024*1024);
+            if (sizeMB > 500){
+              const ok = confirm(`That file is about ${Math.round(sizeMB)} MB. Some browsers may not allow storing very large files. Try anyway?`);
+              if (!ok) return;
+            }
+
+            localFileId = makeId();
+            localFileName = pendingLocalFile.name || "file";
+            localFileType = pendingLocalFile.type || "application/octet-stream";
+
+            await idbPutLocalFile({
+              id: localFileId,
+              name: localFileName,
+              type: localFileType,
+              lastModified: pendingLocalFile.lastModified || Date.now(),
+              blob: pendingLocalFile
+            });
+          } else {
+            if (!url){
+              alert("Please enter a web address.");
+              return;
+            }
+          }
+
+          const item = {
+            id: makeId(),
+            title: title,
+            displayTitle: displayTitle || "",
+            openType: (openType === "local") ? "local" : "web",
+            url: (openType === "local") ? "" : normaliseUrl(url),
+            localFileId: localFileId,
+            localFileName: localFileName,
+            localFileType: localFileType,
+            imageUrl: imageUrl || "",
+            imageData: pendingImageData || "",
+            status: (status==="reading"||status==="future"||status==="finished") ? status : "future",
+            starred: false,
+            tags: tags,
+            notCurrentlyReading: false,
+            series: series,
+            seriesNumber: seriesNumber
+          };
+
+          if (!Array.isArray(settings.links)) settings.links = [];
+          settings.links.push(item);
+          saveSettings();
+          refreshBooks();
+          route();
+          closeModal();
+        }catch(err){
+          console.error(err);
+          alert("Could not add that item. See console for details.");
+        }finally{
+          save.disabled = false;
+          save.textContent = originalLabel;
+        }
+      });
+
+      const cancel = makeBtn("Cancel", "", closeModal);
+      openModal("Add link tile", body, [cancel, save]);
+
+// Toggle between Web link and Local file fields
+const webFields = $("#linkWebFields");
+const localFields = $("#linkLocalFields");
+const localFileInput = $("#linkLocalFileInput");
+const localInfo = $("#linkLocalFileInfo");
+
+function updateOpenTypeUI(){
+  const sel = document.querySelector('input[name="linkOpenType"]:checked');
+  const t = sel ? sel.value : "web";
+  if (t === "local"){
+    webFields.style.display = "none";
+    localFields.style.display = "block";
+  } else {
+    webFields.style.display = "block";
+    localFields.style.display = "none";
+  }
+}
+
+document.querySelectorAll('input[name="linkOpenType"]').forEach(r => {
+  r.addEventListener("change", updateOpenTypeUI);
+});
+updateOpenTypeUI();
+
+if (localFileInput){
+  localFileInput.addEventListener("change", () => {
+    const f = localFileInput.files && localFileInput.files[0] ? localFileInput.files[0] : null;
+    pendingLocalFile = f;
+    if (!localInfo) return;
+    if (!f){
+      localInfo.textContent = "";
+      return;
+    }
+    const mb = (f.size / (1024*1024));
+    const sizeLabel = mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.round(f.size/1024)} KB`;
+    localInfo.textContent = `Selected: ${f.name} (${sizeLabel})`;
+  });
+}
+
+      const imgInput = $("#linkImageInput");
+      const previewWrap = $("#linkImagePreviewWrap");
+      const clearBtn = $("#linkClearImageBtn");
+      const urlInput = $("#linkImageUrlInput");
+
+      function setPreview(src){
+        previewWrap.innerHTML = "";
+        if (!src){
+          previewWrap.innerHTML = `<div style="padding:10px; font-size:12px; color: rgba(255,255,255,.70);">No image selected</div>`;
+          return;
+        }
+        const im = document.createElement("img");
+        im.src = src;
+        im.alt = "Preview";
+        im.style.width = "100%";
+        im.style.height = "220px";
+        im.style.objectFit = "cover";
+        im.style.display = "block";
+        previewWrap.appendChild(im);
+      }
+
+      if (clearBtn){
+        clearBtn.addEventListener("click", () => {
+          pendingImageData = "";
+          pendingImageUrl = "";
+          if (imgInput) imgInput.value = "";
+          if (urlInput) urlInput.value = "";
+          setPreview(pendingImageUrl || pendingImageData || "");
+        });
+      }
+
+      if (imgInput){
+        imgInput.addEventListener("change", (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const dataUrl = String(reader.result || "");
+            // Soft warning for big images (localStorage is limited)
+            if (dataUrl.length > 1_500_000){
+              const ok = confirm("This image is quite large. It may cause localStorage to fill up. Use it anyway?");
+              if (!ok){
+                pendingImageData = "";
+                imgInput.value = "";
+                setPreview(pendingImageUrl || pendingImageData || "");
+                return;
+              }
+            }
+            pendingImageData = dataUrl;
+            pendingImageUrl = "";
+            if (urlInput) urlInput.value = "";
+            setPreview(dataUrl);
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      if (urlInput){
+        urlInput.addEventListener("input", () => {
+          const raw = (urlInput.value || "").trim();
+          pendingImageUrl = raw ? normaliseUrl(raw) : "";
+          if (pendingImageUrl){
+            pendingImageData = "";
+            if (imgInput) imgInput.value = "";
+            setPreview(pendingImageUrl);
+          } else {
+            if (urlInput){
+        urlInput.addEventListener("input", () => {
+          const raw = (urlInput.value || "").trim();
+          pendingImageUrl = raw ? normaliseUrl(raw) : "";
+          if (pendingImageUrl){
+            pendingImageData = "";
+            if (imgInput) imgInput.value = "";
+            setPreview(pendingImageUrl);
+          } else {
+            setPreview(pendingImageData);
+          }
+        });
+      }
+
+      setPreview(pendingImageUrl || pendingImageData || "");
+          }
+        });
+      }
+
+
+      setPreview(pendingImageUrl || pendingImageData || "");
+    }
+
+
+
+    function openEditLinkModal(id){
+      const link = findLinkById(id);
+      if (!link){
+        alert("Couldn't find that link item.");
+        return;
+      }
+
+      const allSeries = uniqueSorted([
+        ...books.map(b => b.series),
+        ...((settings.links||[]).map(l => l.series))
+      ].filter(Boolean));
+
+      let pendingImageData = (typeof link.imageData === "string") ? link.imageData : "";
+      let pendingImageUrl = (typeof link.imageUrl === "string") ? link.imageUrl : "";
+
+      const body = `
+        <div class="form">
+          <div class="row two">
+            <div>
+              <label>Title</label>
+              <input class="field" id="linkTitleInput" value="${escapeHTML(link.title || "")}" />
+              <div class="help">Shown on the tile.</div>
+
+              <div style="height:10px;"></div>
+
+              <label>Display title</label>
+              <input class="field" id="linkDisplayTitleInput" placeholder="Optional – if set, shown instead of Title" />
+              <div class="help">If blank, the tile uses Title.</div>
+
+              <div style="height:10px;"></div>
+
+              <label>Series</label>
+              <input class="field" id="linkSeriesInput" placeholder="Optional – e.g. The Expanse" />
+              <div class="help">Put this tile into a series (it will group on the main page).</div>
+
+              <div style="height:10px;"></div>
+
+              <label>Number in series</label>
+              <input class="field" id="linkSeriesNumberInput" type="number" min="0" step="1" placeholder="Optional – e.g. 3" />
+              <div class="help">Used for ordering on the series page (otherwise alphabetical).</div>
+
+              <div style="height:10px;"></div>
+
+              <label>Web address</label>
+              <input class="field" id="linkUrlInput" value="${escapeHTML(link.url || "")}" />
+              <div class="help">This is what opens when you click the tile.</div>
+
+              <div style="height:10px;"></div>
+
+              <label>Status</label>
+              <select class="field" id="linkStatusSelect">
+                <option value="future">Not started</option>
+                <option value="reading">In progress</option>
+                <option value="finished">Finished</option>
+              </select>
+            </div>
+
+            <div>
+              <label>Cover image</label>
+              <input class="field" id="linkImageUrlInput" placeholder="Image URL (optional) — https://..." />
+              <div class="help">If set, this will be used instead of an uploaded image.</div>
+              <div style="height:10px;"></div>
+              <input class="field" id="linkImageInput" type="file" accept="image/*" />
+              <div class="help">Stored inside your settings as a data URL.</div>
+              <div style="height:10px;"></div>
+              <div id="linkImagePreviewWrap" style="border:1px solid rgba(255,255,255,.12); border-radius: 14px; overflow:hidden; background: rgba(255,255,255,.04);"></div>
+              <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn" id="linkClearImageBtn" type="button">Clear image</button>
+                <button class="btn danger" id="linkDeleteBtn" type="button">Delete tile</button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label>Tags</label>
+            <input class="field" id="linkTagsInput" value="${escapeHTML((Array.isArray(link.tags)?link.tags:[]).join(", "))}" placeholder="comma-separated" />
+          </div>
+        </div>
+      `;
+
+      const save = makeBtn("Save", "primary", () => {
+        const title = ($("#linkTitleInput").value || "").trim();
+        const displayTitle = ($("#linkDisplayTitleInput").value || "").trim();
+        const series = ($("#linkSeriesInput").value || "").trim();
+        const seriesNumRaw = ($("#linkSeriesNumberInput").value || "").trim();
+        const seriesNumber = seriesNumRaw ? (parseInt(seriesNumRaw, 10) || null) : null;
+        const url = ($("#linkUrlInput").value || "").trim();
+        const imageUrlRaw = ($("#linkImageUrlInput").value || "").trim();
+        const imageUrl = imageUrlRaw ? normaliseUrl(imageUrlRaw) : "";
+        const status = ($("#linkStatusSelect").value || "future").trim();
+        const tagsRaw = ($("#linkTagsInput").value || "");
+        const tags = uniqueSorted(tagsRaw.split(",").map(s=>s.trim()).filter(Boolean));
+
+        if (!title){
+          alert("Please enter a title.");
+          return;
+        }
+        if (!url){
+          alert("Please enter a web address.");
+          return;
+        }
+
+        link.title = title;
+        link.displayTitle = displayTitle || "";
+        link.series = series;
+        link.seriesNumber = seriesNumber;
+        link.url = normaliseUrl(url);
+        link.imageUrl = imageUrl || "";
+        link.imageData = pendingImageData || "";
+        link.status = (status==="reading"||status==="future"||status==="finished") ? status : "future";
+        link.tags = tags;
+
+        saveSettings();
+        refreshBooks();
+        route();
+        closeModal();
+      });
+
+      const cancel = makeBtn("Cancel", "", closeModal);
+      openModal("Edit link tile", body, [cancel, save]);
+
+      $("#linkDisplayTitleInput").value = (typeof link.displayTitle === "string") ? link.displayTitle : "";
+      $("#linkSeriesInput").value = (typeof link.series === "string") ? link.series : "";
+      $("#linkSeriesNumberInput").value = (typeof link.seriesNumber === "number" && Number.isFinite(link.seriesNumber)) ? String(link.seriesNumber) : "";
+      $("#linkImageUrlInput").value = (typeof link.imageUrl === "string") ? link.imageUrl : "";
+
+      $("#linkStatusSelect").value = (link.status==="reading"||link.status==="future"||link.status==="finished") ? link.status : "future";
+
+      const imgInput = $("#linkImageInput");
+      const previewWrap = $("#linkImagePreviewWrap");
+      const clearBtn = $("#linkClearImageBtn");
+      const urlInput = $("#linkImageUrlInput");
+      const delBtn = $("#linkDeleteBtn");
+
+      function setPreview(src){
+        previewWrap.innerHTML = "";
+        if (!src){
+          previewWrap.innerHTML = `<div style="padding:10px; font-size:12px; color: rgba(255,255,255,.70);">No image selected</div>`;
+          return;
+        }
+        const im = document.createElement("img");
+        im.src = src;
+        im.alt = "Preview";
+        im.style.width = "100%";
+        im.style.height = "220px";
+        im.style.objectFit = "cover";
+        im.style.display = "block";
+        previewWrap.appendChild(im);
+      }
+
+      if (delBtn){
+        delBtn.addEventListener("click", () => {
+          const ok = confirm("Delete this link tile?");
+          if (!ok) return;
+          removeLinkById(id);
+          refreshBooks();
+          route();
+          closeModal();
+        });
+      }
+
+      if (clearBtn){
+        clearBtn.addEventListener("click", () => {
+          pendingImageData = "";
+          pendingImageUrl = "";
+          if (imgInput) imgInput.value = "";
+          if (urlInput) urlInput.value = "";
+          setPreview(pendingImageUrl || pendingImageData || "");
+        });
+      }
+
+      if (imgInput){
+        imgInput.addEventListener("change", (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const dataUrl = String(reader.result || "");
+            if (dataUrl.length > 1_500_000){
+              const ok = confirm("This image is quite large. It may cause localStorage to fill up. Use it anyway?");
+              if (!ok){
+                pendingImageData = (typeof link.imageData === "string") ? link.imageData : "";
+                imgInput.value = "";
+                setPreview(pendingImageUrl || pendingImageData || "");
+                return;
+              }
+            }
+            pendingImageData = dataUrl;
+            pendingImageUrl = "";
+            if (urlInput) urlInput.value = "";
+            setPreview(dataUrl);
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      if (urlInput){
+        urlInput.addEventListener("input", () => {
+          const raw = (urlInput.value || "").trim();
+          pendingImageUrl = raw ? normaliseUrl(raw) : "";
+          if (pendingImageUrl){
+            pendingImageData = "";
+            if (imgInput) imgInput.value = "";
+            setPreview(pendingImageUrl);
+          } else {
+            setPreview(pendingImageData);
+          }
+        });
+      }
+
+      setPreview(pendingImageUrl || pendingImageData || "");
+    }
+
+
+    function openSettingsModal(){
+      const body = `
+        <div class="form">
+          <div class="row two">
+            <div>
+              <label>Theme</label>
+              <select class="field" id="themeSelect">
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select>
+              <div class="help">Stored as a site setting (exportable).</div>
+            </div>
+            <div>
+              <label>Data</label>
+              <div class="help">Export/import saves your tags, series assignments, and UI preferences.</div>
+              <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn primary" id="exportNowBtn" type="button">Export settings</button>
+                <button class="btn" id="importNowBtn" type="button">Import settings</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+
+          <div class="divider"></div>
+
+          <div>
+            <label>Sections</label>
+            <div style="margin-top:8px; display:flex; gap:18px; flex-wrap:wrap;">
+              <label style="display:flex; gap:10px; align-items:center; cursor:pointer;">
+                <input type="checkbox" id="showStarredSectionToggle" />
+                <span>Show Starred section</span>
+              </label>
+            </div>
+            <div class="help">Turn the Starred section on/off on the home page. Starred items still appear via search and on their tiles.</div>
+          </div>
+
+          <div>
+            <label>Section pill colours</label>
+            <div class="help">These colours are used for the small count pill and the colour marker next to each section title.</div>
+
+            <div class="row two" style="margin-top:10px;">
+              <div>
+                <label>Reading</label>
+                <input class="field" id="pillColorReading" type="color" style="height:42px; padding:6px;" />
+              </div>
+              <div>
+                <label>Starred</label>
+                <input class="field" id="pillColorStarred" type="color" style="height:42px; padding:6px;" />
+              </div>
+            </div>
+
+            <div class="row two" style="margin-top:10px;">
+              <div>
+                <label>Future (Unread)</label>
+                <input class="field" id="pillColorFuture" type="color" style="height:42px; padding:6px;" />
+              </div>
+              <div>
+                <label>Finished</label>
+                <input class="field" id="pillColorFinished" type="color" style="height:42px; padding:6px;" />
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="row two">
+            <div>
+              <label>Tag list</label>
+              <div class="help" id="tagStats"></div>
+              <div class="chips" id="allTagsChips" style="margin-top:10px;"></div>
+            </div>
+            <div>
+              <label>Series list</label>
+              <div class="help" id="seriesStats"></div>
+              <div class="chips" id="allSeriesChips" style="margin-top:10px;"></div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div>
+            <label>Danger zone</label>
+            <div class="help">Clears your Bookshelf settings (tags/series/theme/search/filter). Does not touch Mokuro progress keys.</div>
+            <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn danger" id="clearSettingsBtn" type="button">Clear bookshelf settings</button>
+            </div>
+          </div>
+        </div>
+      `;
+      const close = makeBtn("Done", "primary", closeModal);
+      openModal("Settings", body, [close]);
+
+      // Home sections
+      const showStarred = (settings.ui.showStarredSection !== false);
+      const showStarredEl = $("#showStarredSectionToggle");
+      if (showStarredEl){
+        showStarredEl.checked = showStarred;
+        showStarredEl.addEventListener("change", () => {
+          settings.ui.showStarredSection = showStarredEl.checked;
+          saveSettings();
+          route();
+        });
+      }
+
+
+      $("#themeSelect").value = settings.ui.theme || "dark";
+      $("#themeSelect").addEventListener("change", () => {
+        settings.ui.theme = $("#themeSelect").value;
+        applyTheme();
+        saveSettings();
+      });
+
+      // Section pill colours
+      const defaultPills = { reading: "#69b4ff", starred: "#f6c14b", future: "#b18cff", finished: "#67e0a3" };
+      const pills = (settings.ui && settings.ui.sectionPillColors) ? settings.ui.sectionPillColors : defaultPills;
+      $("#pillColorReading").value = pills.reading || defaultPills.reading;
+      $("#pillColorStarred").value = pills.starred || defaultPills.starred;
+      $("#pillColorFuture").value = pills.future || defaultPills.future;
+      $("#pillColorFinished").value = pills.finished || defaultPills.finished;
+
+      function savePillColours(){
+        settings.ui.sectionPillColors = {
+          reading: $("#pillColorReading").value,
+          starred: $("#pillColorStarred").value,
+          future: $("#pillColorFuture").value,
+          finished: $("#pillColorFinished").value,
+        };
+        saveSettings();
+        applyHomeCols();
+      }
+      $("#pillColorReading").addEventListener("change", savePillColours);
+      $("#pillColorStarred").addEventListener("change", savePillColours);
+      $("#pillColorFuture").addEventListener("change", savePillColours);
+      $("#pillColorFinished").addEventListener("change", savePillColours);
+
+      $("#exportNowBtn").addEventListener("click", exportSiteSettings);
+      $("#importNowBtn").addEventListener("click", () => $("#importFileInput").click());
+
+      // Tag + series chips
+      const allTags = uniqueSorted(books.flatMap(b => b.tags || []).filter(Boolean));
+      const allSeries = uniqueSorted(books.map(b => b.series).filter(Boolean));
+
+      $("#tagStats").textContent = `${allTags.length} unique tag${allTags.length===1?"":"s"}`;
+      $("#seriesStats").textContent = `${allSeries.length} series`;
+
+      const tagWrap = $("#allTagsChips");
+      tagWrap.innerHTML = "";
+      for (const t of allTags.slice(0, 60)){
+        const c = document.createElement("div");
+        c.className = "chip";
+        c.textContent = t;
+        tagWrap.appendChild(c);
+      }
+      if (!allTags.length){
+        const c = document.createElement("div");
+        c.className = "chip muted";
+        c.textContent = "No tags yet";
+        tagWrap.appendChild(c);
+      }
+
+      const seriesWrap = $("#allSeriesChips");
+      seriesWrap.innerHTML = "";
+      for (const s of allSeries.slice(0, 60)){
+        const c = document.createElement("div");
+        c.className = "chip";
+        c.textContent = s;
+        seriesWrap.appendChild(c);
+      }
+      if (!allSeries.length){
+        const c = document.createElement("div");
+        c.className = "chip muted";
+        c.textContent = "No series yet";
+        seriesWrap.appendChild(c);
+      }
+
+      $("#clearSettingsBtn").addEventListener("click", () => {
+        const ok = confirm("Clear bookshelf settings? (Tags/series/theme/search/filter will be reset.)");
+        if (!ok) return;
+        localStorage.removeItem(SETTINGS_KEY);
+        settings = loadSettings();
+        activeTagFiltersDraft = new Set();
+        applyTheme();
+        $("#searchInput").value = "";
+        refreshBooks();
+        route();
+        closeModal();
+      });
+    }
+
+    // ----------------------------
+    // Tag filter panel
+    // ----------------------------
+    function openTagFilterPanel(){
+      $("#tagFilterPanel").classList.add("open");
+    }
+    function closeTagFilterPanel(){
+      $("#tagFilterPanel").classList.remove("open");
+    }
+    function toggleTagFilterPanel(){
+      const open = $("#tagFilterPanel").classList.contains("open");
+      if (open) closeTagFilterPanel();
+      else openTagFilterPanel();
+    }
+
+    function renderTagFilterPanel(){
+  const allTags = uniqueSorted(books.flatMap(b => b.tags || []).filter(Boolean));
+  const list = $("#tagFilterList");
+  list.innerHTML = "";
+
+  if (!allTags.length){
+    const div = document.createElement("div");
+    div.className = "help";
+    div.textContent = "No tags yet. Edit a book and add tags to enable filtering.";
+    list.appendChild(div);
+    return;
+  }
+
+  // Build clickable chips that toggle on/off immediately
+  for (const t of allTags){
+    const chip = document.createElement("div");
+    chip.className = "chip" + (activeTagFiltersDraft.has(t) ? " active" : "");
+    chip.textContent = t;
+    chip.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (activeTagFiltersDraft.has(t)) activeTagFiltersDraft.delete(t);
+      else activeTagFiltersDraft.add(t);
+
+      settings.ui.activeTagFilters = Array.from(activeTagFiltersDraft);
+      saveSettings();
+      renderTagFilterPanel(); // refresh active styling
+      route();                // apply filter immediately
+    });
+    list.appendChild(chip);
+  }
+}
+
+    // ----------------------------
+    // Actions
+    // ----------------------------
+    function removeBookFromShelf(storageKey){
+      const ok = confirm("Remove this book from the shelf? (This removes the mokuro_ progress entry.)");
+      if (!ok) return;
+      localStorage.removeItem(storageKey);
+
+      // Also keep meta tidy
+      const path = decodeMokuroPathFromKey(storageKey);
+      // We leave meta by default (useful if it reappears), but you can uncomment to clean:
+      // delete settings.meta[path]; saveSettings();
+
+      refreshBooks();
+      route();
+    }
+
+    
+
+    function removeSeriesFromShelf(seriesName, seriesBooks){
+      const ok = confirm(`Remove the entire series "${seriesName}" from the shelf? (This removes all tracked volumes and link tiles in that series.)`);
+      if (!ok) return;
+
+      try{
+        // Remove mokuro_ entries for local books
+        (seriesBooks || []).forEach(b => {
+          if (b && b.kind !== "link" && b.key){
+            localStorage.removeItem(b.key);
+          }
+        });
+
+        // Remove link tiles (including local files) assigned to this series
+        if (Array.isArray(settings.links)){
+          const toDelete = settings.links.filter(l => (l && (l.series||"").trim() === seriesName));
+          settings.links = settings.links.filter(l => !(l && (l.series||"").trim() === seriesName));
+          // Clean up stored local file blobs for removed local-file tiles
+          toDelete.forEach(l => {
+            if (l && l.openType === "local" && l.localFileId){
+              idbDeleteLocalFile(l.localFileId).catch(()=>{});
+            }
+          });
+        }
+
+        // Remove series-level meta (starred / not-currently-reading)
+        if (settings.seriesMeta && typeof settings.seriesMeta === "object"){
+          delete settings.seriesMeta[seriesName];
+        }
+
+        saveSettings();
+      }catch(err){
+        console.error(err);
+      }
+
+      refreshBooks();
+      route();
+    }
+
+function applyTheme(){
+      document.body.setAttribute("data-theme", settings.ui.theme === "light" ? "light" : "dark");
+    }
+
+    function refreshBooks(){
+      books = [...getAllBooks(), ...getAllLinks()];
+    }
+
+    // ----------------------------
+    // Wiring
+    // ----------------------------
+    function init(){
+      applyTheme();
+
+      refreshBooks();
+
+      // Restore UI
+      $("#searchInput").value = settings.ui.search || "";
+      activeTagFiltersDraft = new Set(settings.ui.activeTagFilters || []);
+
+      // Header buttons
+      $("#homeBtn").addEventListener("click", () => location.hash = "");
+      $("#backBtn").addEventListener("click", () => location.hash = "");
+
+      $("#refreshBtn").addEventListener("click", () => {
+        refreshBooks();
+        route();
+      });
+
+      const addLinkBtn = document.querySelector('#addLinkBtn');
+      if (addLinkBtn) addLinkBtn.addEventListener('click', openAddLinkModal);
+
+      // Home shelf width controls (per section)
+      document.querySelectorAll(".cols-step[data-shelf-cols-step]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const shelf = btn.getAttribute("data-shelf-cols-step");
+          const dir = parseInt(btn.getAttribute("data-dir") || "1", 10);
+          const hc = settings.ui.homeCols || (settings.ui.homeCols = { reading: 5, starred: 5, future: 5, finished: 5 });
+          const cur = clampInt(hc[shelf], 1, 12, 5);
+          const next = stepCols(cur, dir);
+          hc[shelf] = next;
+          saveSettings();
+          applyHomeCols();
+        });
+      });
+      applyHomeCols();
+
+
+      // Library filter toggle (Include started)
+      const libToggle = $("#libraryShowAllToggle");
+      if (libToggle){
+        libToggle.checked = (settings.ui.libraryShowAll === true);
+        libToggle.addEventListener("change", () => {
+          settings.ui.libraryShowAll = libToggle.checked;
+          saveSettings();
+          route();
+        });
+      }
+
+      $("#settingsBtn").addEventListener("click", openSettingsModal);
+      $("#modalCloseBtn").addEventListener("click", closeModal);
+      $("#modalBackdrop").addEventListener("click", (e) => {
+        if (e.target === $("#modalBackdrop")) closeModal();
+      });
+
+      const _exportBtn = $("#exportBtn");
+      if (_exportBtn) _exportBtn.addEventListener("click", exportSiteSettings);
+const _importBtn = $("#importBtn");
+      if (_importBtn) _importBtn.addEventListener("click", () => $("#importFileInput").click());
+$("#importFileInput").addEventListener("change", (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        importSiteSettingsFromFile(file);
+        e.target.value = "";
+      });
+
+      // Search
+      $("#searchInput").addEventListener("input", () => {
+        settings.ui.search = $("#searchInput").value || "";
+        saveSettings();
+        route();
+      });
+
+      // Tag filter dropdown
+$("#tagFilterBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleTagFilterPanel();
+});
+$("#tagFilterPanel").addEventListener("click", (e) => e.stopPropagation());
+document.addEventListener("click", () => closeTagFilterPanel());
+
+$("#clearTagFiltersBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  activeTagFiltersDraft = new Set();
+  settings.ui.activeTagFilters = [];
+  saveSettings();
+  renderTagFilterPanel();
+  closeTagFilterPanel();
+  route();
+});
+
+// Router
+      window.addEventListener("hashchange", route);
+
+      route();
+    }
+
+    init();
+  
+function getSeriesThumbnailBook(seriesBooks) {
+  if (!seriesBooks || seriesBooks.length === 0) return null;
+
+  const ordered = [...seriesBooks].sort((a, b) => {
+    if (a.seriesNumber != null && b.seriesNumber != null) {
+      return a.seriesNumber - b.seriesNumber;
+    }
+    return (a.title || "").localeCompare(b.title || "");
+  });
+
+  // first book not finished
+  const nextUnread = ordered.find(b => (b.progress ?? 0) < 100);
+
+  // if all finished, show last book
+  return nextUnread || ordered[ordered.length - 1];
+}
+
+
+
+  // Hover preview (desktop only): shows the full cover + title without changing the tidy grid.
+  (function(){
+    const canHover = window.matchMedia && window.matchMedia("(hover:hover)").matches;
+    if(!canHover) return;
+
+    const preview = document.getElementById("hoverPreview");
+    if(!preview) return;
+
+    const pImg = preview.querySelector("img");
+    const pTitle = preview.querySelector(".hp-title");
+    const pSub = preview.querySelector(".hp-sub");
+
+    let activeCard = null;
+    let raf = 0;
+    let lastX = 0;
+    let lastY = 0;
+
+    function setFromCard(card){
+      const img = card.querySelector(".book-top > img") || card.querySelector("img");
+      if(!img || !img.src) return false;
+
+      // Avoid constant reload churn: only update src if different.
+      if(pImg.src !== img.src) pImg.src = img.src;
+
+      const t = (card.querySelector(".book-title")?.textContent || "").trim();
+      const s = (card.querySelector(".book-sub")?.textContent || "").trim();
+
+      pTitle.textContent = t;
+      pSub.textContent = s;
+      pSub.style.display = s ? "block" : "none";
+      return true;
+    }
+
+    function position(x, y){
+      lastX = x; lastY = y;
+      if(raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const pad = 14;
+
+        const w = preview.offsetWidth || 270;
+        const h = preview.offsetHeight || 320;
+
+        let px = lastX + 18;
+        let py = lastY + 18;
+
+        if(px + w + pad > window.innerWidth){
+          px = Math.max(pad, window.innerWidth - w - pad);
+        }
+        if(py + h + pad > window.innerHeight){
+          py = Math.max(pad, window.innerHeight - h - pad);
+        }
+
+        preview.style.transform = `translate(${px}px, ${py}px)`;
+      });
+    }
+
+    function show(card, evt){
+      if(!setFromCard(card)) return;
+      preview.style.display = "block";
+      position(evt.clientX, evt.clientY);
+    }
+
+    function hide(){
+      preview.style.display = "none";
+      activeCard = null;
+    }
+
+    document.addEventListener("pointerover", (evt) => {
+      const card = evt.target.closest(".book-card, .series-card");
+      if(!card) return;
+      if(card === activeCard) return;
+
+      activeCard = card;
+      show(card, evt);
+    });
+
+    document.addEventListener("pointerout", (evt) => {
+      if(!activeCard) return;
+
+      // Only hide when the pointer leaves the active card entirely
+      if(evt.target && activeCard.contains(evt.target)){
+        const rel = evt.relatedTarget;
+        if(rel && activeCard.contains(rel)) return;
+        hide();
+      }
+    });
+
+    document.addEventListener("pointermove", (evt) => {
+      if(preview.style.display !== "block") return;
+      position(evt.clientX, evt.clientY);
+    });
+
+    // Prevent stray previews while scrolling
+    window.addEventListener("scroll", () => {
+      if(preview.style.display === "block") hide();
+    }, { passive: true });
+  })();
+
+</script>
+
+  <!-- Hover preview -->
+  <div id="hoverPreview" aria-hidden="true">
+    <img alt="Cover preview" />
+    <div class="hp-meta">
+      <div class="hp-title"></div>
+      <div class="hp-sub"></div>
+    </div>
+  </div>
+
+</body>
+</html>
