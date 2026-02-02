@@ -1805,6 +1805,61 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
       });
     }
 
+
+    async function idbGetAllLocalFiles(){
+      const db = await openFileDB();
+      return new Promise((resolve, reject) => {
+        try{
+          const tx = db.transaction(["files"], "readonly");
+          const store = tx.objectStore("files");
+          const req = store.getAll ? store.getAll() : null;
+          if (req){
+            req.onsuccess = () => { try{ db.close(); }catch(e){}; resolve(Array.isArray(req.result) ? req.result : []); };
+            req.onerror = () => { try{ db.close(); }catch(e){}; reject(req.error || new Error("Failed to list files")); };
+            return;
+          }
+          // Fallback cursor for older browsers
+          const out = [];
+          const cursorReq = store.openCursor();
+          cursorReq.onsuccess = (e) => {
+            const cur = e.target.result;
+            if (cur){
+              out.push(cur.value);
+              cur.continue();
+            } else {
+              try{ db.close(); }catch(e){};
+              resolve(out);
+            }
+          };
+          cursorReq.onerror = () => { try{ db.close(); }catch(e){}; reject(cursorReq.error || new Error("Failed to list files")); };
+        }catch(err){
+          try{ db.close(); }catch(e){};
+          reject(err);
+        }
+      });
+    }
+
+    function blobToBase64(blob){
+      return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => {
+          const s = String(fr.result || "");
+          const idx = s.indexOf(",");
+          // data:<mime>;base64,<payload>
+          resolve(idx >= 0 ? s.slice(idx+1) : s);
+        };
+        fr.onerror = () => reject(fr.error || new Error("Failed to read file"));
+        fr.readAsDataURL(blob);
+      });
+    }
+
+    function base64ToBlob(base64, mime){
+      const bin = atob(base64);
+      const len = bin.length;
+      const bytes = new Uint8Array(len);
+      for (let i=0; i<len; i++) bytes[i] = bin.charCodeAt(i);
+      return new Blob([bytes], { type: mime || "application/octet-stream" });
+    }
     async function openLocalFileById(fileId){
       if (!fileId) return;
       try{
@@ -2953,35 +3008,141 @@ function renderStatusGrids(bookList, refs){
       URL.revokeObjectURL(url);
     }
 
-    function exportSiteSettings(){
-      const payload = {
-        version: 3,
-        exportedAt: new Date().toISOString(),
-        settings: settings
-      };
-      downloadJSON(`bookshelf-settings-${new Date().toISOString().slice(0,10)}.json`, payload);
+    
+    async function exportSiteSettings(){
+      const btn = $("#exportBtn");
+      const oldText = btn ? btn.textContent : "";
+      if (btn){
+        btn.disabled = true;
+        btn.textContent = "Exporting…";
+      }
+
+      try{
+        // 1) Settings (includes links + meta + UI prefs)
+        const settingsPayload = settings;
+
+        // 2) Mokuro book progress (mokuro_* keys in localStorage)
+        const mokuroStates = {};
+        for (const k of Object.keys(localStorage)){
+          if (!k || !k.startsWith(STORAGE_PREFIX)) continue;
+          const raw = localStorage.getItem(k);
+          if (raw != null) mokuroStates[k] = raw; // keep as raw string
+        }
+
+        // 3) Local files stored in IndexedDB (PDF/CBZ/EPUB/etc)
+        const recs = await idbGetAllLocalFiles().catch(() => []);
+        const localFiles = [];
+        for (const rec of recs){
+          if (!rec || typeof rec.id !== "string" || !rec.id.trim()) continue;
+          if (!rec.blob) continue;
+          const mime = (typeof rec.type === "string" && rec.type) ? rec.type : (rec.blob.type || "application/octet-stream");
+          const base64 = await blobToBase64(rec.blob);
+          localFiles.push({
+            id: rec.id,
+            name: (typeof rec.name === "string") ? rec.name : "",
+            type: mime,
+            size: rec.blob.size || 0,
+            lastModified: (typeof rec.lastModified === "number") ? rec.lastModified : null,
+            base64
+          });
+        }
+
+        const payload = {
+          formatVersion: 4,
+          exportedAt: new Date().toISOString(),
+          settings: settingsPayload,
+          mokuroStates,
+          localFiles
+        };
+
+        downloadJSON(`bookshelf-full-export-${new Date().toISOString().slice(0,10)}.json`, payload);
+      }catch(err){
+        console.error(err);
+        alert("Export failed. See console for details.");
+      }finally{
+        if (btn){
+          btn.disabled = false;
+          btn.textContent = oldText || "Export";
+        }
+      }
     }
 
-    function importSiteSettingsFromFile(file){
+    
+    async function importSiteSettingsFromFile(file){
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         const payload = safeJSONParse(reader.result, null);
         if (!payload || typeof payload !== "object"){
           alert("That file doesn't look like JSON.");
           return;
         }
-        const incoming = payload.settings || payload; // allow raw settings too
-        if (!incoming || typeof incoming !== "object" || !(incoming.version===2 || incoming.version===3)){
-          alert("Unsupported settings file. Expected version 2 or 3.");
+
+        // Accept both the "full export" wrapper, and legacy "settings only" exports.
+        const incomingSettings = payload.settings || payload;
+
+        if (!incomingSettings || typeof incomingSettings !== "object" || !(incomingSettings.version===2 || incomingSettings.version===3)){
+          alert("Unsupported import file. Expected a Bookshelf export (settings version 2 or 3).");
           return;
         }
+
+        // 1) Restore Mokuro progress first (localStorage mokuro_* keys)
+        try{
+          const mokuroStates = payload.mokuroStates;
+          if (mokuroStates && typeof mokuroStates === "object"){
+            for (const [k, raw] of Object.entries(mokuroStates)){
+              if (!k || !k.startsWith(STORAGE_PREFIX)) continue;
+              if (typeof raw !== "string") continue;
+              localStorage.setItem(k, raw);
+            }
+          }
+        }catch(err){
+          console.warn("Failed restoring Mokuro progress:", err);
+        }
+
+        // 2) Restore IndexedDB local files
+        try{
+          const localFiles = payload.localFiles;
+          if (Array.isArray(localFiles) && localFiles.length){
+            // Basic progress feedback
+            const importBtn = $("#importBtn");
+            const old = importBtn ? importBtn.textContent : "";
+            if (importBtn){
+              importBtn.disabled = true;
+              importBtn.textContent = "Importing files…";
+            }
+
+            for (const f of localFiles){
+              if (!f || typeof f.id !== "string" || !f.id.trim()) continue;
+              if (typeof f.base64 !== "string" || !f.base64) continue;
+              const mime = (typeof f.type === "string" && f.type) ? f.type : "application/octet-stream";
+              const blob = base64ToBlob(f.base64, mime);
+              await idbPutLocalFile({
+                id: f.id,
+                name: (typeof f.name === "string") ? f.name : "",
+                type: mime,
+                lastModified: (typeof f.lastModified === "number") ? f.lastModified : Date.now(),
+                blob
+              });
+            }
+
+            if (importBtn){
+              importBtn.disabled = false;
+              importBtn.textContent = old || "Import";
+            }
+          }
+        }catch(err){
+          console.error(err);
+          alert("Imported settings, but some local files could not be restored. See console for details.");
+        }
+
+        // 3) Restore settings (UI prefs, links, meta, series meta, etc)
         settings = {
           ...structuredClone(DEFAULT_SETTINGS),
-          ...incoming,
-          ui: { ...structuredClone(DEFAULT_SETTINGS.ui), ...(incoming.ui || {}) },
-          meta: { ...(incoming.meta || {}) },
-          seriesMeta: { ...(incoming.seriesMeta || {}) },
-          links: Array.isArray(incoming.links) ? incoming.links : []
+          ...incomingSettings,
+          ui: { ...structuredClone(DEFAULT_SETTINGS.ui), ...(incomingSettings.ui || {}) },
+          meta: { ...(incomingSettings.meta || {}) },
+          seriesMeta: { ...(incomingSettings.seriesMeta || {}) },
+          links: Array.isArray(incomingSettings.links) ? incomingSettings.links : []
         };
         if (settings.version === 2) settings.version = 3;
         if (!settings.seriesMeta || typeof settings.seriesMeta !== "object") settings.seriesMeta = {};
