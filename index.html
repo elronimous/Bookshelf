@@ -388,8 +388,8 @@
     .shelf-panel .book-sub2{
       font-size: .86em;
     }
-        .shelf-panel .progress-overlay .progress-bar{ height: var(--progH); }
-    .shelf-panel.compact-progress .progress-pct{ display:none; }
+        .shelf-panel .progress-overlay .progress-bar{ height: var(--progH); pointer-events:none; }
+    .shelf-panel.compact-progress .pct-toggle{ display:block; opacity:.92; }
 
 
     .section-title{
@@ -514,7 +514,7 @@
       position:absolute;
       inset: 0;
       background: linear-gradient(to top, rgba(0,0,0,.64), rgba(0,0,0,0) 55%);
-      pointer-events:none;
+      pointer-events:auto;
     }
     .series-meta{
       position:absolute;
@@ -560,7 +560,7 @@
       overflow: hidden;
     }
     .series-meta .chip{
-      background: rgba(0,0,0,.42);
+      background: rgba(0,0,0,.20);
       border-color: rgba(255,255,255,.16);
       color: rgba(255,255,255,.90);
     }
@@ -614,7 +614,7 @@
     #seriesPage .book-overlay{
       background:
         linear-gradient(to bottom, rgba(0,0,0,.52), rgba(0,0,0,0) 42%),
-        linear-gradient(to top, rgba(0,0,0,.68), rgba(0,0,0,0) 58%);
+        linear-gradient(to top, rgba(0,0,0,.45), rgba(0,0,0,0) 58%);
     }
 
 
@@ -807,7 +807,7 @@
       inset: 0;
       background:
         linear-gradient(to bottom, rgba(0,0,0,.52), rgba(0,0,0,0) 42%),
-        linear-gradient(to top, rgba(0,0,0,.68), rgba(0,0,0,0) 58%);
+        linear-gradient(to top, rgba(0,0,0,.45), rgba(0,0,0,0) 58%);
       pointer-events:none;
     }
 
@@ -884,28 +884,50 @@
       flex: 1 1 auto;
       border-radius: 999px;
       overflow:hidden;
+      pointer-events: none;
       border: 1px solid rgba(255,255,255,.22);
-      background: rgba(0,0,0,.42);
+      background: rgba(0,0,0,.20);
       position: relative;
-      box-shadow: 0 6px 16px rgba(0,0,0,.25);
+      box-shadow: none;
     }
     .progress-overlay .progress-fill{
       height: 100%;
       width: 0%;
       background: linear-gradient(90deg, var(--accent), var(--good));
-      box-shadow: 0 0 16px rgba(142,197,255,.35), 0 0 10px rgba(126,231,135,.20);
+      box-shadow: 0 0 10px rgba(142,197,255,.25), 0 0 8px rgba(126,231,135,.18);
     }
-    .progress-overlay .progress-pct{
-      display:block;
-      min-width: 44px;
+    .pct-toggle{
+      position:absolute;
+      right: 10px;
+      bottom: 10px;
+      z-index: 4;
+      min-width: 48px;
       text-align:right;
       font-size: 12px;
       font-weight: 950;
       letter-spacing: .2px;
       color: rgba(255,255,255,.96);
-      text-shadow: 0 2px 14px rgba(0,0,0,.75), 0 1px 2px rgba(0,0,0,.85);
-      padding-right: 2px;
+      text-shadow: 0 2px 10px rgba(0,0,0,.85), 0 1px 0 rgba(0,0,0,.55);
+      padding: 2px 6px;
       line-height: 1;
+      border: 0;
+      background: rgba(255,255,255,.06);
+      border-radius: 10px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-appearance: none;
+      appearance: none;
+      transition: background .15s ease, transform .15s ease, opacity .15s ease;
+      opacity: .92;
+      pointer-events:auto;
+    }
+    .book-card:hover .pct-toggle{
+      background: rgba(255,255,255,.10);
+      opacity: 1;
+    }
+    .book-card.actions-open .pct-toggle{
+      background: rgba(255,255,255,.14);
+      transform: translateY(-1px);
     }
     /* Tile actions (toggle + panel) */
 .tile-actions{
@@ -919,28 +941,6 @@
   align-items:flex-end;
   gap: 8px;
 }
-.tile-actions-toggle{
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.18);
-  background: rgba(0,0,0,.32);
-  color: rgba(255,255,255,.94);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  cursor:pointer;
-  user-select:none;
-  opacity: .38; /* low opacity */
-  transition: opacity .15s ease, transform .15s ease, background .15s ease;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  font-size: 20px;
-  line-height: 1;
-  padding: 0;
-}
-.book-card:hover .tile-actions-toggle{ opacity: .80; }
-.tile-actions-toggle:active{ transform: scale(.96); }
 
 .tile-actions-panel{
   display:flex;
@@ -957,7 +957,6 @@
   transform: translateY(0);
   pointer-events: auto;
 }
-.book-card.actions-open .tile-actions-toggle{ opacity: .85; }
 
 .tile-actions .book-actions{
   position: static;
@@ -1039,7 +1038,7 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
       line-height: 1.18;
       color: rgba(255,255,255,.98);
       /* stronger shadow for readability over bright covers */
-      text-shadow: 0 2px 14px rgba(0,0,0,.75), 0 1px 2px rgba(0,0,0,.85);
+      text-shadow: 0 1px 4px rgba(0,0,0,.65);
       display:-webkit-box;
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
@@ -1066,7 +1065,7 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
 }
 
 /* Series tiles reuse the book card layout */
-.series-tile .book-actions{ display:none; }
+.series-tile .book-actions{ display:flex; }
 .series-tile .book-open{ z-index: 3; }
 .series-tile .book-title{ min-height: unset; }
 .series-mosaic{
@@ -1476,8 +1475,7 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
         <div class="book-overlay"></div>
 
         <div class="tile-actions" aria-label="Tile actions">
-          <button class="tile-actions-toggle" type="button" aria-label="Show actions" title="Actions">‹</button>
-          <div class="tile-actions-panel" aria-label="Actions panel">
+<div class="tile-actions-panel" aria-label="Actions panel">
             <div class="tag-hover" aria-label="Tags">
               <button class="tag-icon" type="button" title="Tags">🏷️</button>
               <div class="tag-pop"></div>
@@ -1502,8 +1500,9 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
 
         <div class="progress-overlay" aria-label="Progress">
           <div class="progress-bar"><div class="progress-fill"></div></div>
-          <span class="progress-pct"></span>
         </div>
+
+        <button class="pct-toggle" type="button" aria-label="Show tile actions"></button>
       </div>
     </div>
   </template>
@@ -1805,61 +1804,6 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
       });
     }
 
-
-    async function idbGetAllLocalFiles(){
-      const db = await openFileDB();
-      return new Promise((resolve, reject) => {
-        try{
-          const tx = db.transaction(["files"], "readonly");
-          const store = tx.objectStore("files");
-          const req = store.getAll ? store.getAll() : null;
-          if (req){
-            req.onsuccess = () => { try{ db.close(); }catch(e){}; resolve(Array.isArray(req.result) ? req.result : []); };
-            req.onerror = () => { try{ db.close(); }catch(e){}; reject(req.error || new Error("Failed to list files")); };
-            return;
-          }
-          // Fallback cursor for older browsers
-          const out = [];
-          const cursorReq = store.openCursor();
-          cursorReq.onsuccess = (e) => {
-            const cur = e.target.result;
-            if (cur){
-              out.push(cur.value);
-              cur.continue();
-            } else {
-              try{ db.close(); }catch(e){};
-              resolve(out);
-            }
-          };
-          cursorReq.onerror = () => { try{ db.close(); }catch(e){}; reject(cursorReq.error || new Error("Failed to list files")); };
-        }catch(err){
-          try{ db.close(); }catch(e){};
-          reject(err);
-        }
-      });
-    }
-
-    function blobToBase64(blob){
-      return new Promise((resolve, reject) => {
-        const fr = new FileReader();
-        fr.onload = () => {
-          const s = String(fr.result || "");
-          const idx = s.indexOf(",");
-          // data:<mime>;base64,<payload>
-          resolve(idx >= 0 ? s.slice(idx+1) : s);
-        };
-        fr.onerror = () => reject(fr.error || new Error("Failed to read file"));
-        fr.readAsDataURL(blob);
-      });
-    }
-
-    function base64ToBlob(base64, mime){
-      const bin = atob(base64);
-      const len = bin.length;
-      const bytes = new Uint8Array(len);
-      for (let i=0; i<len; i++) bytes[i] = bin.charCodeAt(i);
-      return new Blob([bytes], { type: mime || "application/octet-stream" });
-    }
     async function openLocalFileById(fileId){
       if (!fileId) return;
       try{
@@ -2234,7 +2178,7 @@ function visibleBooks(){
       const fill = card.querySelector(".progress-fill");
       fill.style.width = `${book.percentComplete}%`;
 
-      const pctEl = card.querySelector(".progress-pct");
+      const pctEl = card.querySelector(".pct-toggle");
       if (pctEl) pctEl.textContent = `${Math.round(book.percentComplete)}%`;
 
       const po = card.querySelector(".progress-overlay");
@@ -2263,12 +2207,10 @@ const openA = card.querySelector('[data-action="open"]');
         });
       }
 
-      // Actions toggle (small low-opacity button that reveals the icon strip)
-      const actionsToggle = card.querySelector(".tile-actions-toggle");
+      // Actions toggle (reveal/hide the icon strip)
+      const actionsToggle = card.querySelector(".pct-toggle");
       if (actionsToggle){
-        const stop = (e)=>{ e.preventDefault(); e.stopPropagation(); };
-        ["mousedown","mouseup","touchstart","touchend"].forEach(ev => actionsToggle.addEventListener(ev, stop, { passive:false }));
-        actionsToggle.addEventListener("click", (e)=>{
+        actionsToggle.addEventListener("pointerup", (e)=>{
           e.preventDefault();
           e.stopPropagation();
           card.classList.toggle("actions-open");
@@ -2375,7 +2317,7 @@ const openA = card.querySelector('[data-action="open"]');
       const provider = (link.openType === "local") ? "Local file" : linkProviderLabel(link.url);
       const pctText = `${Math.round(link.percentComplete)}%`;
 
-      const pctEl = card.querySelector(".progress-pct");
+      const pctEl = card.querySelector(".pct-toggle");
       if (pctEl) pctEl.textContent = pctText;
 
       const po = card.querySelector(".progress-overlay");
@@ -2660,7 +2602,7 @@ function createSeriesGroupCard(seriesName, seriesBooks, opts={}){
   fill.style.width = `${currentBook.percentComplete}%`;
 
   const pctText = `${Math.round(currentBook.percentComplete)}%`;
-  const pctEl = card.querySelector(".progress-pct");
+  const pctEl = card.querySelector(".pct-toggle");
   if (pctEl) pctEl.textContent = pctText;
 
   let detail = "";
@@ -2720,20 +2662,18 @@ function createSeriesGroupCard(seriesName, seriesBooks, opts={}){
     }, { passive:false });
   });
 
-  // Actions toggle (small low-opacity button that reveals the icon strip)
-  const actionsToggle = card.querySelector(".tile-actions-toggle");
-  if (actionsToggle){
-    const stop = (e)=>{ e.preventDefault(); e.stopPropagation(); };
-    ["mousedown","mouseup","touchstart","touchend"].forEach(ev => actionsToggle.addEventListener(ev, stop, { passive:false }));
-    actionsToggle.addEventListener("click", (e)=>{
-      e.preventDefault();
-      e.stopPropagation();
-      card.classList.toggle("actions-open");
-    }, { passive:false });
+  // Actions toggle (reveal/hide the icon strip)
+      const actionsToggle = card.querySelector(".pct-toggle");
+      if (actionsToggle){
+        actionsToggle.addEventListener("pointerup", (e)=>{
+          e.preventDefault();
+          e.stopPropagation();
+          card.classList.toggle("actions-open");
+        }, { passive:false });
 
-    // Close the strip when you move off the tile (keeps the UI neat)
-    card.addEventListener("mouseleave", ()=> card.classList.remove("actions-open"));
-  }
+        // Close the strip when you move off the tile (keeps the UI neat)
+        card.addEventListener("mouseleave", ()=> card.classList.remove("actions-open"));
+      }
 
   return card;
 }
@@ -3008,141 +2948,35 @@ function renderStatusGrids(bookList, refs){
       URL.revokeObjectURL(url);
     }
 
-    
-    async function exportSiteSettings(){
-      const btn = $("#exportBtn");
-      const oldText = btn ? btn.textContent : "";
-      if (btn){
-        btn.disabled = true;
-        btn.textContent = "Exporting…";
-      }
-
-      try{
-        // 1) Settings (includes links + meta + UI prefs)
-        const settingsPayload = settings;
-
-        // 2) Mokuro book progress (mokuro_* keys in localStorage)
-        const mokuroStates = {};
-        for (const k of Object.keys(localStorage)){
-          if (!k || !k.startsWith(STORAGE_PREFIX)) continue;
-          const raw = localStorage.getItem(k);
-          if (raw != null) mokuroStates[k] = raw; // keep as raw string
-        }
-
-        // 3) Local files stored in IndexedDB (PDF/CBZ/EPUB/etc)
-        const recs = await idbGetAllLocalFiles().catch(() => []);
-        const localFiles = [];
-        for (const rec of recs){
-          if (!rec || typeof rec.id !== "string" || !rec.id.trim()) continue;
-          if (!rec.blob) continue;
-          const mime = (typeof rec.type === "string" && rec.type) ? rec.type : (rec.blob.type || "application/octet-stream");
-          const base64 = await blobToBase64(rec.blob);
-          localFiles.push({
-            id: rec.id,
-            name: (typeof rec.name === "string") ? rec.name : "",
-            type: mime,
-            size: rec.blob.size || 0,
-            lastModified: (typeof rec.lastModified === "number") ? rec.lastModified : null,
-            base64
-          });
-        }
-
-        const payload = {
-          formatVersion: 4,
-          exportedAt: new Date().toISOString(),
-          settings: settingsPayload,
-          mokuroStates,
-          localFiles
-        };
-
-        downloadJSON(`bookshelf-full-export-${new Date().toISOString().slice(0,10)}.json`, payload);
-      }catch(err){
-        console.error(err);
-        alert("Export failed. See console for details.");
-      }finally{
-        if (btn){
-          btn.disabled = false;
-          btn.textContent = oldText || "Export";
-        }
-      }
+    function exportSiteSettings(){
+      const payload = {
+        version: 3,
+        exportedAt: new Date().toISOString(),
+        settings: settings
+      };
+      downloadJSON(`bookshelf-settings-${new Date().toISOString().slice(0,10)}.json`, payload);
     }
 
-    
-    async function importSiteSettingsFromFile(file){
+    function importSiteSettingsFromFile(file){
       const reader = new FileReader();
-      reader.onload = async () => {
+      reader.onload = () => {
         const payload = safeJSONParse(reader.result, null);
         if (!payload || typeof payload !== "object"){
           alert("That file doesn't look like JSON.");
           return;
         }
-
-        // Accept both the "full export" wrapper, and legacy "settings only" exports.
-        const incomingSettings = payload.settings || payload;
-
-        if (!incomingSettings || typeof incomingSettings !== "object" || !(incomingSettings.version===2 || incomingSettings.version===3)){
-          alert("Unsupported import file. Expected a Bookshelf export (settings version 2 or 3).");
+        const incoming = payload.settings || payload; // allow raw settings too
+        if (!incoming || typeof incoming !== "object" || !(incoming.version===2 || incoming.version===3)){
+          alert("Unsupported settings file. Expected version 2 or 3.");
           return;
         }
-
-        // 1) Restore Mokuro progress first (localStorage mokuro_* keys)
-        try{
-          const mokuroStates = payload.mokuroStates;
-          if (mokuroStates && typeof mokuroStates === "object"){
-            for (const [k, raw] of Object.entries(mokuroStates)){
-              if (!k || !k.startsWith(STORAGE_PREFIX)) continue;
-              if (typeof raw !== "string") continue;
-              localStorage.setItem(k, raw);
-            }
-          }
-        }catch(err){
-          console.warn("Failed restoring Mokuro progress:", err);
-        }
-
-        // 2) Restore IndexedDB local files
-        try{
-          const localFiles = payload.localFiles;
-          if (Array.isArray(localFiles) && localFiles.length){
-            // Basic progress feedback
-            const importBtn = $("#importBtn");
-            const old = importBtn ? importBtn.textContent : "";
-            if (importBtn){
-              importBtn.disabled = true;
-              importBtn.textContent = "Importing files…";
-            }
-
-            for (const f of localFiles){
-              if (!f || typeof f.id !== "string" || !f.id.trim()) continue;
-              if (typeof f.base64 !== "string" || !f.base64) continue;
-              const mime = (typeof f.type === "string" && f.type) ? f.type : "application/octet-stream";
-              const blob = base64ToBlob(f.base64, mime);
-              await idbPutLocalFile({
-                id: f.id,
-                name: (typeof f.name === "string") ? f.name : "",
-                type: mime,
-                lastModified: (typeof f.lastModified === "number") ? f.lastModified : Date.now(),
-                blob
-              });
-            }
-
-            if (importBtn){
-              importBtn.disabled = false;
-              importBtn.textContent = old || "Import";
-            }
-          }
-        }catch(err){
-          console.error(err);
-          alert("Imported settings, but some local files could not be restored. See console for details.");
-        }
-
-        // 3) Restore settings (UI prefs, links, meta, series meta, etc)
         settings = {
           ...structuredClone(DEFAULT_SETTINGS),
-          ...incomingSettings,
-          ui: { ...structuredClone(DEFAULT_SETTINGS.ui), ...(incomingSettings.ui || {}) },
-          meta: { ...(incomingSettings.meta || {}) },
-          seriesMeta: { ...(incomingSettings.seriesMeta || {}) },
-          links: Array.isArray(incomingSettings.links) ? incomingSettings.links : []
+          ...incoming,
+          ui: { ...structuredClone(DEFAULT_SETTINGS.ui), ...(incoming.ui || {}) },
+          meta: { ...(incoming.meta || {}) },
+          seriesMeta: { ...(incoming.seriesMeta || {}) },
+          links: Array.isArray(incoming.links) ? incoming.links : []
         };
         if (settings.version === 2) settings.version = 3;
         if (!settings.seriesMeta || typeof settings.seriesMeta !== "object") settings.seriesMeta = {};
