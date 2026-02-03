@@ -2321,13 +2321,14 @@ for (const ln of Array.from(doc.querySelectorAll('link[rel]'))){
             const pending = new Map();
             let seq = 0;
 
+            const ABS_RE = new RegExp('^(?:[a-z][a-z0-9+.-]*:|//)', 'i');
             function isRel(u){
               if (!u) return false;
               const s = String(u).trim();
               if (!s) return false;
               if (s.startsWith("#")) return false;
               // absolute or protocol-relative
-              return !/^(?:[a-z][a-z0-9+.-]*:|\\/\\/)/i.test(s);
+              return !ABS_RE.test(s);
             }
 
             function requestUrl(path){
@@ -2991,10 +2992,23 @@ function seriesLineForItem(item){
         rel = (extractMokuroRelPathFromUrl(book.path, rootName) || "").trim();
       }
 
-      // Use a tiny transparent placeholder first to avoid triggering a 404 image load.
-      if (folderLinked && rel && book.coverPage){
-        img.src = _TRANSPARENT_PX;
-      } else {
+      // Prefer local cover when this is a Mokuro volume and a linked folder is available.
+      // This avoids spamming GitHub 404s for paths like https://.../W:/Mokuro%20Bookshelf/.../cover00060.jpeg
+      let usedLocal = false;
+      if (folderLinked && rel){
+        let coverName = book.coverPage;
+        if (!coverName){
+          const m = String(book.coverUrl || "").match(/([^\/\?#]+\.(?:jpe?g|png|webp|gif))/i);
+          if (m) coverName = decodeURIComponent(m[1]);
+        }
+        if (coverName){
+          const coverRel = normaliseSlashes(rel.replace(/\.html$/i, "") + "/" + coverName);
+          img.src = _TRANSPARENT_PX;
+          setCoverPreferLocal(img, coverRel, book.coverUrl);
+          usedLocal = true;
+        }
+      }
+      if (!usedLocal){
         img.src = book.coverUrl;
       }
 
@@ -3439,19 +3453,36 @@ function createSeriesGroupCard(seriesName, seriesBooks, opts={}){
   const img = top.querySelector("img");
   if (img){
     if (currentBook && currentBook.coverUrl){
-      if (currentBook && currentBook.coverPage){
-      img.src = _TRANSPARENT_PX;
-    } else {
-      img.src = currentBook.coverUrl;
-    }
       img.loading = "lazy";
+      img.style.display = "";
+
+      // Prefer local covers for Mokuro volumes (avoids GitHub 404 spam), otherwise use the stored coverUrl.
+      let didLocal = false;
+      const metaForPath = currentBook ? (getMeta(currentBookrrentBook.path) || {}) : {};
+      const rel = currentBook ? (metaForPath.mokuroRelPath || currentBook.mokuroRelPath || extractMokuroRelPathFromUrl(currentBook.path, "") || "").trim() : "";
+      if (rel){
+        let coverName = currentBook.coverPage;
+        if (!coverName){
+          const m2 = String(currentBook.coverUrl || "").match(/([^\/\?#]+\.(?:jpe?g|png|webp|gif))/i);
+          if (m2) coverName = decodeURIComponent(m2[1]);
+        }
+        if (coverName){
+          const coverRel = normaliseSlashes(rel.replace(/\.html$/i, "") + "/" + coverName);
+          img.src = _TRANSPARENT_PX;
+          setCoverPreferLocal(img, coverRel, currentBook.coverUrl);
+          didLocal = true;
+        }
+      }
+      if (!didLocal){
+        img.src = currentBook.coverUrl;
+      }
       img.style.display = "";
 
       setCoverBgFromImg(top, img);
       img.addEventListener("load", () => setCoverBgFromImg(top, img));
 
       // If this is a Mokuro volume, try to load the cover from the linked folder (helps series stacks).
-      const metaForPath = currentBook ? (getMeta(currentBook.path) || {}) : {};
+      const metaForPath = currentBook ? (getMeta(currentBookrrentBook.path) || {}) : {};
       const rel = currentBook ? (metaForPath.mokuroRelPath || currentBook.mokuroRelPath || extractMokuroRelPathFromUrl(currentBook.path, "") || "").trim() : "";
       if (currentBook && rel){
         let coverName = currentBook.coverPage;
