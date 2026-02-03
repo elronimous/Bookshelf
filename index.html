@@ -2327,6 +2327,33 @@ for (const ln of Array.from(doc.querySelectorAll('link[rel]'))){
               }
             }catch(e){}
 
+            // Patch setAttribute for dynamic src/href (covers code that uses el.setAttribute("src", "..."))
+            try{
+              const _origSetAttr = Element.prototype.setAttribute;
+              Element.prototype.setAttribute = function(name, value){
+                try{
+                  const n = String(name||"").toLowerCase();
+                  if (n === "src" && this instanceof HTMLImageElement){
+                    const v = String(value||"");
+                    if (isRel(v)){
+                      // set a placeholder immediately to avoid a network fetch
+                      _origSetAttr.call(this, name, "");
+                      requestUrl(v).then(u => _origSetAttr.call(this, name, u));
+                      return;
+                    }
+                  }
+                  if (n === "href" && this instanceof HTMLLinkElement){
+                    const v = String(value||"");
+                    if (isRel(v)){
+                      requestUrl(v).then(u => _origSetAttr.call(this, name, u));
+                      return;
+                    }
+                  }
+                }catch(e){}
+                return _origSetAttr.apply(this, arguments);
+              };
+            }catch(e){}
+
             // Patch fetch
             try{
               const origFetch = window.fetch;
@@ -2387,21 +2414,50 @@ for (const ln of Array.from(doc.querySelectorAll('link[rel]'))){
     }
 
 // Cache object URLs for Mokuro cover images loaded from the linked folder
+const _TRANSPARENT_PX = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+
+// Cache object URLs for Mokuro cover images loaded from the linked folder
 const _mokuroCoverUrlCache = new Map();
-async function setCoverFromLinkedMokuro(imgEl, coverRelPath){
+
+async function hasReadPermission(handle){
+  if (!handle) return false;
   try{
-    if (!imgEl || !coverRelPath) return;
+    const p = await handle.queryPermission({ mode: "read" });
+    return (p === "granted");
+  }catch(e){
+    // Some contexts throw; if we have a handle, assume okay.
+    return true;
+  }
+}
+
+/**
+ * Tries to set an <img> to a local cover from the linked Mokuro folder.
+ * Returns true if it successfully set a blob URL, false otherwise.
+ *
+ * opts.allowPrompt:
+ *  - false: never triggers a permission prompt (safe to call during render)
+ *  - true: may request permission if needed
+ */
+async function setCoverFromLinkedMokuro(imgEl, coverRelPath, opts){
+  try{
+    if (!imgEl || !coverRelPath) return false;
     const rel = normaliseSlashes(coverRelPath);
+
     const cached = _mokuroCoverUrlCache.get(rel);
     if (cached){
       imgEl.src = cached;
-      return;
+      return true;
     }
+
     const root = await getLinkedMokuroFolder();
-    if (!root) return;
-    const ok = await ensureHandlePermission(root);
-    if (!ok) return;
+    if (!root) return false;
+
+    const allowPrompt = !!(opts && opts.allowPrompt);
+    const permOk = allowPrompt ? await ensureHandlePermission(root) : await hasReadPermission(root);
+    if (!permOk) return false;
+
     let fh = await getFileHandleByRelPath(root, rel);
+
     // Fallback: some Mokuro outputs place cover images beside the HTML, not inside the images folder.
     if (!fh){
       try{
@@ -2414,16 +2470,39 @@ async function setCoverFromLinkedMokuro(imgEl, coverRelPath){
         }
       }catch(e){}
     }
-    if (!fh) return;
+
+    if (!fh) return false;
+
     const file = await fh.getFile();
     const url = URL.createObjectURL(file);
     _mokuroCoverUrlCache.set(rel, url);
     imgEl.src = url;
-  }catch(e){}
+    return true;
+  }catch(e){
+    return false;
+  }
 }
 
+// Prefer local cover when available, but avoid spamming 404s to GitHub
+function setCoverPreferLocal(imgEl, coverRelPath, fallbackUrl){
+  if (!imgEl) return;
 
-    async function refreshLibraryToUseLinkedMokuroFolder(dirHandle){
+  const fallback = String(fallbackUrl || "").trim();
+  const badFallback = (!fallback) || (/\/[a-zA-Z]:\//.test(fallback)); // e.g. "/W:/Mokuro%20Bookshelf/..."
+
+  // Start with a harmless placeholder so we don't fire a web request that 404s
+  imgEl.src = _TRANSPARENT_PX;
+
+  // Try local without prompting (render-safe). If it fails, only fall back when the fallback is a real web URL.
+  setCoverFromLinkedMokuro(imgEl, coverRelPath, { allowPrompt: false }).then((ok) => {
+    if (!ok && fallback && !badFallback){
+      imgEl.src = fallback;
+    }
+  }).catch(() => {
+    if (fallback && !badFallback) imgEl.src = fallback;
+  });
+}
+async function refreshLibraryToUseLinkedMokuroFolder(dirHandle){
       try{
         const rootName = (settings.ui && settings.ui.mokuroFolderName) ? settings.ui.mokuroFolderName : (dirHandle && dirHandle.name ? dirHandle.name : "");
         // Build an index of HTML files under the linked folder
@@ -2862,7 +2941,7 @@ function seriesLineForItem(item){
 
       // If a Mokuro folder is linked, prefer loading/opening from the linked folder
       // (avoids broken GitHub-style URLs like https://.../W:/Mokuro%20Bookshelf/...).
-      const folderLinked = !!(settings.ui && settings.ui.mokuroFolderLinked);
+      const folderLinked = !!(_mokuroRootHandleMem || (settings.ui && settings.ui.mokuroFolderLinked));
       const rootName = (settings.ui && settings.ui.mokuroFolderName) ? settings.ui.mokuroFolderName : "";
       const metaForPath = getMeta(book.path) || {};
       let rel = (metaForPath.mokuroRelPath || book.mokuroRelPath || "").trim();
@@ -2872,15 +2951,13 @@ function seriesLineForItem(item){
       }
 
       // Use a tiny transparent placeholder first to avoid triggering a 404 image load.
-      const TRANSPARENT_PIXEL = "data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA=";
-
-      if (folderLinked && rel){
-        img.src = TRANSPARENT_PIXEL;
+      if (folderLinked && rel && book.coverPage){
+        img.src = _TRANSPARENT_PX;
       } else {
         img.src = book.coverUrl;
       }
 
-      // Blurred backdrop behind the cover (keeps grid tidy without heavy cropping)
+// Blurred backdrop behind the cover (keeps grid tidy without heavy cropping)
       const topEl = card.querySelector(".book-top");
       setCoverBgFromImg(topEl, img);
       img.addEventListener("load", () => setCoverBgFromImg(topEl, img));
@@ -2945,7 +3022,7 @@ function seriesLineForItem(item){
         // Load the cover from disk so tiles don't show broken images.
         if (book.coverPage){
           const coverRel = normaliseSlashes(rel.replace(/\.html$/i, "") + "/" + book.coverPage);
-          setCoverFromLinkedMokuro(img, coverRel);
+          setCoverPreferLocal(img, coverRel, book.coverUrl);
         }
       } else {
         openA.href = book.path;
@@ -3316,7 +3393,11 @@ function createSeriesGroupCard(seriesName, seriesBooks, opts={}){
   const img = top.querySelector("img");
   if (img){
     if (currentBook && currentBook.coverUrl){
+      if (currentBook && currentBook.coverPage){
+      img.src = _TRANSPARENT_PX;
+    } else {
       img.src = currentBook.coverUrl;
+    }
       img.loading = "lazy";
       img.style.display = "";
 
@@ -3330,7 +3411,7 @@ function createSeriesGroupCard(seriesName, seriesBooks, opts={}){
         if (rel){
           const coverRel = normaliseSlashes(rel.replace(/\.html$/i, "") + "/" + currentBook.coverPage);
           // async; will update img.src when resolved
-          setCoverFromLinkedMokuro(img, coverRel);
+          setCoverPreferLocal(img, coverRel, currentBook.coverUrl);
         }
       }
     } else {
@@ -4769,12 +4850,41 @@ if (localFileInput){
 
       async function refreshMokuroFolderStatus(){
         const el = $("#mokuroFolderStatus");
-        if (!el) return;
         const name = (settings.ui && settings.ui.mokuroFolderName) ? settings.ui.mokuroFolderName : "";
+
+        // If we already have a live handle in memory, we can use it immediately.
         if (_mokuroRootHandleMem){
-          el.textContent = name ? `Linked: ${name} (this session)` : `Linked folder (this session)`;
+          if (el){
+            el.textContent = name ? `Linked: ${name} (this session)` : `Linked folder (this session)`;
+          }
+          // Keep a simple flag for UI; actual use should still check permission when needed.
+          if (settings.ui){ settings.ui.mokuroFolderLinked = true; saveSettings(); }
           return;
         }
+
+        // Try to restore from IndexedDB
+        const rec = await idbGetHandle("mokuroRoot").catch(()=>null);
+        if (rec && rec.handle){
+          _mokuroRootHandleMem = rec.handle;
+
+          let perm = "prompt";
+          try{
+            perm = await rec.handle.queryPermission({mode:"read"});
+          }catch(e){ perm = "prompt"; }
+
+          const permText = (perm==="granted") ? "permission granted" : "permission needed";
+          if (el){
+            el.textContent = name ? `Linked: ${name} (${permText})` : `Linked folder (${permText})`;
+          }
+          if (settings.ui){
+            settings.ui.mokuroFolderLinked = true;
+            saveSettings();
+          }
+          return;
+        }
+
+        if (el) el.textContent = "Not linked";
+      }
         const rec = await idbGetHandle("mokuroRoot").catch(()=>null);
         if (rec && rec.handle){
           const perm = await (async()=>{
@@ -4975,6 +5085,9 @@ function applyTheme(){
     // ----------------------------
     function init(){
       applyTheme();
+
+      // Restore linked Mokuro folder handle (if previously granted)
+      refreshMokuroFolderStatus();
 
       refreshBooks();
 
