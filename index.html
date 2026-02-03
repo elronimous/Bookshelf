@@ -1993,6 +1993,16 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
         } else {
           cur = await cur.getDirectoryHandle(part);
         }
+
+
+async function getDirectoryHandleByRelPath(rootDirHandle, relPath){
+      const parts = normaliseSlashes(relPath).split("/").filter(Boolean);
+      let cur = rootDirHandle;
+      for (let i=0; i<parts.length; i++){
+        cur = await cur.getDirectoryHandle(parts[i]);
+      }
+      return cur;
+    }
       }
       return null;
     }
@@ -2008,22 +2018,191 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
         alert("Permission to read the Mokuro folder wasn't granted.");
         return;
       }
+
+      // Opening the raw HTML as a blob breaks relative image paths (they resolve against blob:).
+      // Instead, we rewrite the Mokuro HTML so every relative asset (images/css/js) becomes a blob URL
+      // backed by files read from the linked folder handle.
       try{
-        const fh = await getFileHandleByRelPath(root, relPath);
+        const relNorm = normaliseSlashes(relPath);
+        const parts = relNorm.split("/").filter(Boolean);
+        const fileName = parts.pop() || "";
+        const dirRel = parts.join("/");
+        const dirHandle = dirRel ? await getDirectoryHandleByRelPath(root, dirRel) : root;
+
+        const fh = await getFileHandleByRelPath(root, relNorm);
         if (!fh){
           alert("Couldn't find that file in your linked Mokuro folder.");
           return;
         }
+
         const file = await fh.getFile();
-        const url = URL.createObjectURL(file);
-        const w = window.open(url, "_blank", "noopener,noreferrer");
-        if (!w) location.href = url;
-        setTimeout(() => { try{ URL.revokeObjectURL(url); }catch(e){} }, 60_000);
+        const htmlText = await file.text();
+
+        const baseName = (fileName || file.name || "").replace(/\.html$/i, "");
+        let assetsDirHandle = null;
+        try{
+          // Mokuro typically stores images in a sibling folder named exactly like the HTML without .html
+          // e.g. "Dragonhead 01.html" -> folder "Dragonhead 01/"
+          if (baseName) assetsDirHandle = await dirHandle.getDirectoryHandle(baseName);
+        }catch(e){
+          assetsDirHandle = null;
+        }
+
+        const assetUrlCache = new Map();   // decodedRelPath -> blob url
+        const createdObjectUrls = new Set(); // for cleanup
+
+        const isExternalUrl = (u) => {
+          const s = String(u || "").trim();
+          if (!s) return true;
+          if (s.startsWith("#")) return true;
+          if (s.startsWith("data:")) return true;
+          if (s.startsWith("blob:")) return true;
+          if (s.startsWith("mailto:")) return true;
+          return /^([a-z]+:)?\/\//i.test(s); // http(s)://, //cdn...
+        };
+
+        const decodePath = (p) => {
+          // Decode each segment so "Dragonhead%2001/0001.jpg" maps to "Dragonhead 01/0001.jpg"
+          return String(p || "").split("/").map(seg => {
+            try{ return decodeURIComponent(seg); }catch(e){ return seg; }
+          }).join("/");
+        };
+
+        async function fileHandleToUrl(fileHandle){
+          const f = await fileHandle.getFile();
+          const u = URL.createObjectURL(f);
+          createdObjectUrls.add(u);
+          return u;
+        }
+
+        async function getAssetObjectUrl(relAssetPath){
+          const decoded = normaliseSlashes(decodePath(relAssetPath)).replace(/^\.\//, "");
+          if (!decoded) return null;
+
+          const cached = assetUrlCache.get(decoded);
+          if (cached) return cached;
+
+          // 1) Common case: "<baseName>/..." living inside the assets folder
+          if (assetsDirHandle && baseName && (decoded === baseName || decoded.startsWith(baseName + "/"))){
+            const sub = decoded === baseName ? "" : decoded.slice(baseName.length + 1);
+            if (sub){
+              try{
+                const h = await getFileHandleByRelPath(assetsDirHandle, sub);
+                if (h){
+                  const u = await fileHandleToUrl(h);
+                  assetUrlCache.set(decoded, u);
+                  return u;
+                }
+              }catch(e){}
+            }
+          }
+
+          // 2) Try relative to the HTML's directory (css/js beside the html, etc.)
+          try{
+            const h2 = await getFileHandleByRelPath(dirHandle, decoded);
+            if (h2){
+              const u2 = await fileHandleToUrl(h2);
+              assetUrlCache.set(decoded, u2);
+              return u2;
+            }
+          }catch(e){}
+
+          // 3) If there's no folder component, and we have an assets folder, try inside it
+          if (assetsDirHandle){
+            try{
+              const h3 = await getFileHandleByRelPath(assetsDirHandle, decoded);
+              if (h3){
+                const u3 = await fileHandleToUrl(h3);
+                assetUrlCache.set(decoded, u3);
+                return u3;
+              }
+            }catch(e){}
+          }
+
+          return null;
+        }
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlText, "text/html");
+
+        async function rewriteAttribute(selector, attr, isSrcset){
+          const nodes = Array.from(doc.querySelectorAll(selector));
+          for (const el of nodes){
+            const v = el.getAttribute(attr);
+            if (!v) continue;
+
+            if (isSrcset){
+              const candidates = v.split(",").map(s => s.trim()).filter(Boolean);
+              const rewritten = [];
+              for (const c of candidates){
+                const bits = c.split(/\s+/);
+                const u0 = bits[0];
+                if (!u0 || isExternalUrl(u0)){
+                  rewritten.push(c);
+                  continue;
+                }
+                const u = await getAssetObjectUrl(u0);
+                if (u){
+                  bits[0] = u;
+                  rewritten.push(bits.join(" "));
+                } else {
+                  rewritten.push(c);
+                }
+              }
+              el.setAttribute(attr, rewritten.join(", "));
+              continue;
+            }
+
+            const raw = v.trim();
+            if (!raw || isExternalUrl(raw)) continue;
+            const u = await getAssetObjectUrl(raw);
+            if (u) el.setAttribute(attr, u);
+          }
+        }
+
+        // Rewrite common asset references
+        await rewriteAttribute("img[src]", "src", false);
+        await rewriteAttribute("img[srcset]", "srcset", true);
+        await rewriteAttribute("source[srcset]", "srcset", true);
+        await rewriteAttribute("link[href]", "href", false);
+        await rewriteAttribute("script[src]", "src", false);
+
+        // Rewrite url(...) within inline <style> blocks
+        for (const st of Array.from(doc.querySelectorAll("style"))){
+          let css = st.textContent || "";
+          const re = /url\(\s*(['"]?)([^'")]+)\1\s*\)/g;
+          const matches = [...css.matchAll(re)];
+          for (const match of matches){
+            const raw = match[2];
+            if (!raw || isExternalUrl(raw)) continue;
+            const u = await getAssetObjectUrl(raw);
+            if (u){
+              css = css.replace(match[0], 'url("' + u + '")');
+            }
+          }
+          st.textContent = css;
+        }
+
+        const finalHtml = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+        const docUrl = URL.createObjectURL(new Blob([finalHtml], {type:"text/html"}));
+
+        const w = window.open(docUrl, "_blank", "noopener,noreferrer");
+        if (!w) location.href = docUrl;
+
+        // Revoke document blob URL later; keep asset URLs until tab closes.
+        setTimeout(() => { try{ URL.revokeObjectURL(docUrl); }catch(e){} }, 120000);
+
+        if (w){
+          w.addEventListener("beforeunload", () => {
+            for (const u of createdObjectUrls){
+              try{ URL.revokeObjectURL(u); }catch(e){}
+            }
+          });
+        }
       }catch(err){
         console.error(err);
         alert("Couldn't open that Mokuro file from the linked folder. See console for details.");
       }
-    
     }
 
 // Cache object URLs for Mokuro cover images loaded from the linked folder
@@ -2950,6 +3129,17 @@ function createSeriesGroupCard(seriesName, seriesBooks, opts={}){
 
       setCoverBgFromImg(top, img);
       img.addEventListener("load", () => setCoverBgFromImg(top, img));
+
+      // If this is a Mokuro volume, try to load the cover from the linked folder (helps series stacks).
+      if (currentBook && currentBook.coverPage){
+        const metaForPath = getMeta(currentBook.path) || {};
+        const rel = (metaForPath.mokuroRelPath || currentBook.mokuroRelPath || extractMokuroRelPathFromUrl(currentBook.path, "") || "").trim();
+        if (rel){
+          const coverRel = normaliseSlashes(rel.replace(/\.html$/i, "") + "/" + currentBook.coverPage);
+          // async; will update img.src when resolved
+          setCoverFromLinkedMokuro(img, coverRel);
+        }
+      }
     } else {
       img.style.display = "none";
     }
