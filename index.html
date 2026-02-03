@@ -2485,8 +2485,27 @@ function seriesLineForItem(item){
       card.dataset.key = book.key;
 
       const img = card.querySelector("img");
-      img.src = book.coverUrl;
       img.loading = "lazy";
+
+      // If a Mokuro folder is linked, prefer loading/opening from the linked folder
+      // (avoids broken GitHub-style URLs like https://.../W:/Mokuro%20Bookshelf/...).
+      const folderLinked = !!(settings.ui && settings.ui.mokuroFolderLinked);
+      const rootName = (settings.ui && settings.ui.mokuroFolderName) ? settings.ui.mokuroFolderName : "";
+      const metaForPath = getMeta(book.path) || {};
+      let rel = (metaForPath.mokuroRelPath || book.mokuroRelPath || "").trim();
+      if (folderLinked && !rel){
+        // Derive a rel path directly from the stored path (works even if meta wasn't refreshed yet)
+        rel = (extractMokuroRelPathFromUrl(book.path, rootName) || "").trim();
+      }
+
+      // Use a tiny transparent placeholder first to avoid triggering a 404 image load.
+      const TRANSPARENT_PIXEL = "data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA=";
+
+      if (folderLinked && rel){
+        img.src = TRANSPARENT_PIXEL;
+      } else {
+        img.src = book.coverUrl;
+      }
 
       // Blurred backdrop behind the cover (keeps grid tidy without heavy cropping)
       const topEl = card.querySelector(".book-top");
@@ -2527,31 +2546,45 @@ function seriesLineForItem(item){
       if (po) po.title = `${Math.round(book.percentComplete)}% • ${book.currentPage}/${book.totalPages}`;
 
       wireTagHover(card, book.tags);
-const openA = card.querySelector('[data-action="open"]');
-      openA.href = book.path;
 
-// If this Mokuro tile corresponds to a file inside the linked Mokuro folder,
-// open it from disk (via the folder handle) instead of using a GitHub/file URL.
-const bmeta = getMeta(book.path) || {};
-const rel = (bmeta.mokuroRelPath || book.mokuroRelPath || "").trim();
-if (rel && settings.ui && settings.ui.mokuroFolderLinked){
-  openA.href = "#";
-  openA.removeAttribute("target");
-  openA.removeAttribute("rel");
-  openA.setAttribute("aria-label", "Open Mokuro file");
-  openA.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    openMokuroFromLinkedFolder(rel);
-  }, { passive:false });
+      const openA = card.querySelector('[data-action="open"]');
 
-  // Try to load the cover from the linked folder so the tile image isn't broken
-  if (book.coverPage){
-    const coverRel = normaliseSlashes(rel.replace(/\.html$/i, "") + "/" + book.coverPage);
-    setCoverFromLinkedMokuro(img, coverRel);
-  }
-}
+      // Open behavior: local linked Mokuro folder when available, otherwise fall back to the stored path.
+      if (folderLinked && rel){
+        openA.href = "#";
+        openA.removeAttribute("target");
+        openA.removeAttribute("rel");
+        openA.setAttribute("aria-label", "Open Mokuro file (linked folder)");
+        openA.addEventListener("click", async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          // Recompute rel on click as a fallback (in case meta was added after this card was created)
+          const mNow = getMeta(book.path) || {};
+          const relNow = (mNow.mokuroRelPath || rel || extractMokuroRelPathFromUrl(book.path, rootName) || "").trim();
+          if (relNow){
+            openMokuroFromLinkedFolder(relNow);
+          } else {
+            // Fallback: open the stored path
+            window.open(book.path, "_blank", "noopener,noreferrer");
+          }
+        }, { passive:false });
 
+        // Load the cover from disk so tiles don't show broken images.
+        if (book.coverPage){
+          const coverRel = normaliseSlashes(rel.replace(/\.html$/i, "") + "/" + book.coverPage);
+          setCoverFromLinkedMokuro(img, coverRel);
+        }
+      } else {
+        openA.href = book.path;
+        // If it's a web URL, open in new tab like other links
+        if (/^https?:\/\//i.test(book.path)){
+          openA.target = "_blank";
+          openA.rel = "noopener noreferrer";
+        } else {
+          openA.removeAttribute("target");
+          openA.removeAttribute("rel");
+        }
+      }
 
       // Star
       const starBtn = card.querySelector('[data-action="star"]');
