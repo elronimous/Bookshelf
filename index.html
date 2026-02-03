@@ -2597,14 +2597,30 @@ for (const ln of Array.from(doc.querySelectorAll('link[rel]'))){
 
         }catch(e){}
 
-        const finalHtml = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
-        const docUrl = URL.createObjectURL(new Blob([finalHtml], {type:"text/html"}));
+        const finalHtml = "<!DOCTYPE html>
+" + doc.documentElement.outerHTML;
 
-        const w = window.open(docUrl, "_blank");
-        if (!w) location.href = docUrl;
-
-        // Revoke document blob URL later; keep asset URLs until tab closes.
-        setTimeout(() => { try{ URL.revokeObjectURL(docUrl); }catch(e){} }, 120000);
+        // Use about:blank + document.write so the opened tab inherits this page's origin.
+        // This avoids blob:null origin isolation issues (common when running as file://).
+        const w = window.open("", "_blank");
+        if (w){
+          try{
+            w.document.open();
+            w.document.write(finalHtml);
+            w.document.close();
+          }catch(e){
+            // If document.write fails, fall back to navigating to a blob URL
+            const docUrl = URL.createObjectURL(new Blob([finalHtml], {type:"text/html"}));
+            try{ w.location.href = docUrl; }catch(e2){ location.href = docUrl; }
+            setTimeout(() => { try{ URL.revokeObjectURL(docUrl); }catch(e){} }, 120000);
+          }
+        } else {
+          // Popup blocked: fall back to same-tab navigation to a blob URL
+          const docUrl = URL.createObjectURL(new Blob([finalHtml], {type:"text/html"}));
+          location.href = docUrl;
+          setTimeout(() => { try{ URL.revokeObjectURL(docUrl); }catch(e){} }, 120000);
+          return;
+        }
 
         if (w){
           w.addEventListener("beforeunload", () => {
@@ -2612,8 +2628,7 @@ for (const ln of Array.from(doc.querySelectorAll('link[rel]'))){
               try{ URL.revokeObjectURL(u); }catch(e){}
             }
           });
-        }
-      }catch(err){
+        }}catch(err){
         console.error(err);
         alert("Couldn't open that Mokuro file from the linked folder. See console for details.");
       }
