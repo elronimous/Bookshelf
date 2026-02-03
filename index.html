@@ -2024,6 +2024,8 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
         alert("Couldn't open that Mokuro file from the linked folder. See console for details.");
       }
     
+    }
+
 // Cache object URLs for Mokuro cover images loaded from the linked folder
 const _mokuroCoverUrlCache = new Map();
 async function setCoverFromLinkedMokuro(imgEl, coverRelPath){
@@ -2048,7 +2050,6 @@ async function setCoverFromLinkedMokuro(imgEl, coverRelPath){
   }catch(e){}
 }
 
-}
 
     async function refreshLibraryToUseLinkedMokuroFolder(dirHandle){
       try{
