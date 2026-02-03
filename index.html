@@ -1958,6 +1958,46 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
       }
     }
 
+    async function refreshMokuroFolderStatus(){
+        const el = $("#mokuroFolderStatus");
+        const name = (settings.ui && settings.ui.mokuroFolderName) ? settings.ui.mokuroFolderName : "";
+
+        // If we already have a live handle in memory, we can use it immediately.
+        if (_mokuroRootHandleMem){
+          if (el){
+            el.textContent = name ? `Linked: ${name} (this session)` : `Linked folder (this session)`;
+          }
+          // Keep a simple flag for UI; actual use should still check permission when needed.
+          if (settings.ui){ settings.ui.mokuroFolderLinked = true; saveSettings(); }
+          return;
+        }
+
+        // Try to restore from IndexedDB
+        const rec = await idbGetHandle("mokuroRoot").catch(()=>null);
+        if (rec && rec.handle){
+          _mokuroRootHandleMem = rec.handle;
+
+          let perm = "prompt";
+          try{
+            perm = await rec.handle.queryPermission({mode:"read"});
+          }catch(e){ perm = "prompt"; }
+
+          const permText = (perm==="granted") ? "permission granted" : "permission needed";
+          if (el){
+            el.textContent = name ? `Linked: ${name} (${permText})` : `Linked folder (${permText})`;
+          }
+          if (settings.ui){
+            settings.ui.mokuroFolderLinked = true;
+            saveSettings();
+          }
+          return;
+        }
+
+        if (el) el.textContent = "Not linked";
+      }
+
+
+
     // --- Mokuro folder linking: map existing library items to local folder files ---
     function decodeMaybe(str){
       try{ return decodeURIComponent(str); }catch{ return str; }
@@ -2287,7 +2327,7 @@ for (const ln of Array.from(doc.querySelectorAll('link[rel]'))){
               if (!s) return false;
               if (s.startsWith("#")) return false;
               // absolute or protocol-relative
-              return !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(s);
+              return !/^(?:[a-z][a-z0-9+.-]*:|\\/\\/)/i.test(s);
             }
 
             function requestUrl(path){
@@ -3021,8 +3061,13 @@ function seriesLineForItem(item){
         }, { passive:false });
 
         // Load the cover from disk so tiles don't show broken images.
-        if (book.coverPage){
-          const coverRel = normaliseSlashes(rel.replace(/\.html$/i, "") + "/" + book.coverPage);
+        let coverName = book.coverPage;
+        if (!coverName){
+          const m = String(book.coverUrl || "").match(/([^\/\?#]+\.(?:jpe?g|png|webp|gif))/i);
+          if (m) coverName = decodeURIComponent(m[1]);
+        }
+        if (coverName){
+          const coverRel = normaliseSlashes(rel.replace(/\.html$/i, "") + "/" + coverName);
           setCoverPreferLocal(img, coverRel, book.coverUrl);
         }
       } else {
@@ -3406,11 +3451,16 @@ function createSeriesGroupCard(seriesName, seriesBooks, opts={}){
       img.addEventListener("load", () => setCoverBgFromImg(top, img));
 
       // If this is a Mokuro volume, try to load the cover from the linked folder (helps series stacks).
-      if (currentBook && currentBook.coverPage){
-        const metaForPath = getMeta(currentBook.path) || {};
-        const rel = (metaForPath.mokuroRelPath || currentBook.mokuroRelPath || extractMokuroRelPathFromUrl(currentBook.path, "") || "").trim();
-        if (rel){
-          const coverRel = normaliseSlashes(rel.replace(/\.html$/i, "") + "/" + currentBook.coverPage);
+      const metaForPath = currentBook ? (getMeta(currentBook.path) || {}) : {};
+      const rel = currentBook ? (metaForPath.mokuroRelPath || currentBook.mokuroRelPath || extractMokuroRelPathFromUrl(currentBook.path, "") || "").trim() : "";
+      if (currentBook && rel){
+        let coverName = currentBook.coverPage;
+        if (!coverName){
+          const m = String(currentBook.coverUrl || "").match(/([^\/\?#]+\.(?:jpe?g|png|webp|gif))/i);
+          if (m) coverName = decodeURIComponent(m[1]);
+        }
+        if (coverName){
+          const coverRel = normaliseSlashes(rel.replace(/\.html$/i, "") + "/" + coverName);
           // async; will update img.src when resolved
           setCoverPreferLocal(img, coverRel, currentBook.coverUrl);
         }
@@ -4849,43 +4899,7 @@ if (localFileInput){
       $("#exportNowBtn").addEventListener("click", exportAllData);
       $("#importNowBtn").addEventListener("click", () => $("#importFileInput").click());
 
-      async function refreshMokuroFolderStatus(){
-        const el = $("#mokuroFolderStatus");
-        const name = (settings.ui && settings.ui.mokuroFolderName) ? settings.ui.mokuroFolderName : "";
-
-        // If we already have a live handle in memory, we can use it immediately.
-        if (_mokuroRootHandleMem){
-          if (el){
-            el.textContent = name ? `Linked: ${name} (this session)` : `Linked folder (this session)`;
-          }
-          // Keep a simple flag for UI; actual use should still check permission when needed.
-          if (settings.ui){ settings.ui.mokuroFolderLinked = true; saveSettings(); }
-          return;
-        }
-
-        // Try to restore from IndexedDB
-        const rec = await idbGetHandle("mokuroRoot").catch(()=>null);
-        if (rec && rec.handle){
-          _mokuroRootHandleMem = rec.handle;
-
-          let perm = "prompt";
-          try{
-            perm = await rec.handle.queryPermission({mode:"read"});
-          }catch(e){ perm = "prompt"; }
-
-          const permText = (perm==="granted") ? "permission granted" : "permission needed";
-          if (el){
-            el.textContent = name ? `Linked: ${name} (${permText})` : `Linked folder (${permText})`;
-          }
-          if (settings.ui){
-            settings.ui.mokuroFolderLinked = true;
-            saveSettings();
-          }
-          return;
-        }
-
-        if (el) el.textContent = "Not linked";
-      }
+      
 
       const linkBtn = $("#linkMokuroFolderBtn");
       const unlinkBtn = $("#unlinkMokuroFolderBtn");
