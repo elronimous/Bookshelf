@@ -1982,32 +1982,39 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
     }
 
     async function getFileHandleByRelPath(rootDirHandle, relPath){
-      const parts = normaliseSlashes(relPath).split("/").filter(Boolean);
-      if (!parts.length) return null;
-      let cur = rootDirHandle;
-      for (let i=0; i<parts.length; i++){
-        const part = parts[i];
-        const isLast = (i === parts.length-1);
-        if (isLast){
-          return await cur.getFileHandle(part);
-        } else {
-          cur = await cur.getDirectoryHandle(part);
-        }
-
+  const parts = normaliseSlashes(relPath).split("/").filter(Boolean);
+  if (!parts.length) return null;
+  let cur = rootDirHandle;
+  try{
+    for (let i=0; i<parts.length; i++){
+      const part = parts[i];
+      const isLast = (i === parts.length - 1);
+      if (isLast){
+        return await cur.getFileHandle(part);
+      } else {
+        cur = await cur.getDirectoryHandle(part);
+      }
+    }
+  }catch(e){
+    return null;
+  }
+  return null;
+}
 
 async function getDirectoryHandleByRelPath(rootDirHandle, relPath){
-      const parts = normaliseSlashes(relPath).split("/").filter(Boolean);
-      let cur = rootDirHandle;
-      for (let i=0; i<parts.length; i++){
-        cur = await cur.getDirectoryHandle(parts[i]);
-      }
-      return cur;
+  const parts = normaliseSlashes(relPath).split("/").filter(Boolean);
+  let cur = rootDirHandle;
+  try{
+    for (let i=0; i<parts.length; i++){
+      cur = await cur.getDirectoryHandle(parts[i]);
     }
-      }
-      return null;
-    }
+    return cur;
+  }catch(e){
+    return null;
+  }
+}
 
-    async function openMokuroFromLinkedFolder(relPath){
+async function openMokuroFromLinkedFolder(relPath){
       const root = await getLinkedMokuroFolder();
       if (!root){
         alert("Mokuro folder isn't linked yet (or permission wasn't granted). Use Settings → Link your Mokuro folder.");
@@ -2161,11 +2168,48 @@ async function getDirectoryHandleByRelPath(rootDirHandle, relPath){
         }
 
         // Rewrite common asset references
-        await rewriteAttribute("img[src]", "src", false);
-        await rewriteAttribute("img[srcset]", "srcset", true);
-        await rewriteAttribute("source[srcset]", "srcset", true);
-        await rewriteAttribute("link[href]", "href", false);
-        await rewriteAttribute("script[src]", "src", false);
+await rewriteAttribute("img[src]", "src", false);
+await rewriteAttribute("img[srcset]", "srcset", true);
+await rewriteAttribute("source[srcset]", "srcset", true);
+await rewriteAttribute("link[href]", "href", false);
+await rewriteAttribute("script[src]", "src", false);
+
+// Important: if Mokuro uses external stylesheets that reference images via url(...),
+// rewriting just the <link href> isn't enough (the CSS would still point at relative files).
+// So we rewrite stylesheet contents too.
+for (const ln of Array.from(doc.querySelectorAll('link[rel]'))){
+  const rel = (ln.getAttribute("rel") || "").toLowerCase();
+  if (!rel.includes("stylesheet")) continue;
+  const href = (ln.getAttribute("href") || "").trim();
+  if (!href || isExternalUrl(href)) continue;
+  // Only handle local CSS files
+  if (!/\.css($|[?#])/i.test(href)) continue;
+
+  try{
+    const cssPath = decodePath(href).replace(/^\.\//, "");
+    const cssHandle = await getFileHandleByRelPath(dirHandle, cssPath);
+    if (!cssHandle) continue;
+    const cssFile = await cssHandle.getFile();
+    let cssText = await cssFile.text();
+
+    const reCss = /url\(\s*(['"]?)([^'")]+)\1\s*\)/g;
+    const matches = [...cssText.matchAll(reCss)];
+    for (const match of matches){
+      const raw = match[2];
+      if (!raw || isExternalUrl(raw)) continue;
+      const u = await getAssetObjectUrl(raw);
+      if (u){
+        cssText = cssText.replace(match[0], 'url("' + u + '")');
+      }
+    }
+
+    const cssUrl = URL.createObjectURL(new Blob([cssText], {type:"text/css"}));
+    createdObjectUrls.add(cssUrl);
+    ln.setAttribute("href", cssUrl);
+  }catch(e){
+    // ignore stylesheet rewrite errors
+  }
+}
 
         // Rewrite url(...) within inline <style> blocks
         for (const st of Array.from(doc.querySelectorAll("style"))){
