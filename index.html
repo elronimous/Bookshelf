@@ -1455,7 +1455,7 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
         </div>
       </div>
 
-      <div class="grid grid-5" id="seriesAllGrid"></div>
+      <div class="shelf-panel" data-shelf="series"><div class="grid" id="seriesAllGrid"></div></div>
     </div>
   </div>
 
@@ -2272,6 +2272,29 @@ async function openMokuroFromLinkedFolder(relPath){
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlText, "text/html");
 
+        // Mokuro embeds page images as inline background-image URLs on .pageContainer elements.
+        // When opened from a blob: URL, those relative URLs 404. Record them and clear most of them,
+        // then lazy-resolve the visible pages at runtime via postMessage.
+        try{
+          const pages = Array.from(doc.querySelectorAll('#pagesContainer > .page'));
+          const lastIdx = pages.length ? (pages.length - 1) : -1;
+          pages.forEach((pageEl, idx) => {
+            const pc = pageEl && pageEl.querySelector ? pageEl.querySelector('.pageContainer') : null;
+            if (!pc) return;
+            const bg = (pc.style && pc.style.backgroundImage) ? pc.style.backgroundImage : "";
+            const m = bg && bg.match(/^url\(["']?(.*?)["']?\)$/i);
+            if (!m) return;
+            const rel = m[1];
+            if (!rel) return;
+            pc.setAttribute("data-mokuro-bg", rel);
+            // Keep a url(...) string on the first/second/last page so mokuro's storeCoverImage() still works.
+            if (!(idx === 0 || idx === 1 || idx === lastIdx)){
+              pc.style.backgroundImage = "none";
+            }
+          });
+        }catch(e){}
+
+
         // Safe localStorage shim: Mokuro sometimes uses localStorage; blob/file origins may block it.
         // We avoid touching window.localStorage by rewriting scripts to use __SAFE_LS__ instead.
         const shimScript = doc.createElement("script");
@@ -2434,6 +2457,9 @@ for (const ln of Array.from(doc.querySelectorAll('link[rel]'))){
               });
             }
 
+            window.__mokuroRequestUrl = requestUrl;
+            window.__mokuroToken = TOKEN;
+
             window.addEventListener("message", (ev) => {
               const d = ev.data || {};
               if (!d || d.type !== "mokuro-asset-resp") return;
@@ -2518,6 +2544,57 @@ for (const ln of Array.from(doc.querySelectorAll('link[rel]'))){
             });
           })();`;
           doc.body.appendChild(s);
+
+          // Lazy-resolve inline background images (data-mokuro-bg) for the currently visible pages.
+          // This avoids loading hundreds of large image blobs up-front.
+          try{
+            const lazy = doc.createElement("script");
+            lazy.textContent = `(function(){
+              function loadVisible(){
+                const rq = window.__mokuroRequestUrl;
+                if (typeof rq !== "function") return;
+                const pages = Array.from(document.querySelectorAll('#pagesContainer > .page'));
+                for (const p of pages){
+                  const cs = getComputedStyle(p);
+                  if (!cs || cs.display === "none") continue;
+                  const pc = p.querySelector('.pageContainer[data-mokuro-bg]');
+                  if (!pc) continue;
+                  if (pc.dataset.mokuroLoaded === "1") continue;
+                  pc.dataset.mokuroLoaded = "1";
+                  const rel = pc.getAttribute("data-mokuro-bg");
+                  rq(rel).then((u) => {
+                    if (!u || !pc.isConnected) return;
+                    pc.style.backgroundImage = 'url("' + u + '")';
+                  }).catch(() => { pc.dataset.mokuroLoaded = "0"; });
+                }
+              }
+
+              function wrapUpdatePage(){
+                const up = window.updatePage;
+                if (typeof up === "function" && !up.__mkWrapped){
+                  const wrapped = function(){
+                    const r = up.apply(this, arguments);
+                    try{ loadVisible(); }catch(e){}
+                    return r;
+                  };
+                  wrapped.__mkWrapped = true;
+                  window.updatePage = wrapped;
+                }
+              }
+
+              document.addEventListener("DOMContentLoaded", () => {
+                wrapUpdatePage();
+                try{ loadVisible(); }catch(e){}
+                const cont = document.getElementById("pagesContainer");
+                if (cont && window.MutationObserver){
+                  const obs = new MutationObserver(() => { try{ loadVisible(); }catch(e){} });
+                  obs.observe(cont, {subtree:true, attributes:true, attributeFilter:["style","class"]});
+                }
+              });
+            })();`;
+            doc.body.appendChild(lazy);
+          }catch(e){}
+
         }catch(e){}
 
         const finalHtml = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
@@ -2907,7 +2984,7 @@ function setCoverBgFromImg(topEl, imgEl){
     
     function applyHomeCols(){
       const hc = (settings.ui && settings.ui.homeCols) ? settings.ui.homeCols : {};
-      for (const shelf of ["reading","starred","future","finished"]){
+      for (const shelf of ["reading","starred","future","finished","series"]){
         const cols = clampInt(hc[shelf], 1, 12, 5);
         const panel = document.querySelector(`.shelf-panel[data-shelf="${shelf}"]`);
         if (panel){
