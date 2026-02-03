@@ -1766,6 +1766,43 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
     // but the file blobs live in this browser's IndexedDB.
     // ----------------------------
     const FILE_DB_NAME = "BookshelfLocalFiles";
+
+    // --- Mokuro linked folder (session + persistent) + per-volume asset resolvers ---
+    // In some contexts (notably file://), storing a directory handle in IndexedDB can fail or behave inconsistently.
+    // We keep an in-memory handle for the current session so "Linked" works immediately even if persistence fails.
+    let _mokuroRootHandleMem = null;
+
+    // Per-volume asset resolvers used when opening Mokuro HTML via blob: (to resolve dynamically-loaded assets).
+    const _mokuroResolvers = new Map(); // token -> { getAssetObjectUrl, createdObjectUrls }
+
+    // Message bridge for opened Mokuro windows (same-origin blob tabs).
+    window.addEventListener("message", async (ev) => {
+      try{
+        const d = ev.data || {};
+        if (!d || typeof d !== "object") return;
+        if (d.type === "mokuro-asset-req"){
+          const token = d.token;
+          const path = d.path;
+          const reqId = d.reqId;
+          const res = _mokuroResolvers.get(token);
+          if (!res || !res.getAssetObjectUrl) return;
+          const url = await res.getAssetObjectUrl(path);
+          ev.source && ev.source.postMessage({ type:"mokuro-asset-resp", token, reqId, url: url || null }, "*");
+          return;
+        }
+        if (d.type === "mokuro-asset-close"){
+          const token = d.token;
+          const res = _mokuroResolvers.get(token);
+          if (res && res.createdObjectUrls){
+            try{
+              for (const u of res.createdObjectUrls){ try{ URL.revokeObjectURL(u); }catch(e){} }
+            }catch(e){}
+          }
+          _mokuroResolvers.delete(token);
+          return;
+        }
+      }catch(e){}
+    });
     const FILE_DB_VERSION = 2;
 
     function openFileDB(){
@@ -1863,7 +1900,8 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
         const rp = await handle.requestPermission(opts);
         return (rp === "granted");
       }catch(err){
-        return false;
+        // Some contexts (notably file://) may throw on permission queries; the user has already explicitly picked the folder.
+        try{ return (location.protocol === "file:"); }catch(e){ return true; }
       }
     }
 
@@ -1879,7 +1917,8 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
           alert("Permission was not granted, so the folder wasn't linked.");
           return null;
         }
-        await idbPutHandle("mokuroRoot", dirHandle);
+        _mokuroRootHandleMem = dirHandle;
+        try{ await idbPutHandle("mokuroRoot", dirHandle); }catch(e){ /* persistence may fail in some contexts */ }
         settings.ui.mokuroFolderLinked = true;
         settings.ui.mokuroFolderName = dirHandle.name || "";
         saveSettings();
@@ -1896,6 +1935,7 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
     }
 
     async function unlinkMokuroFolder(){
+      _mokuroRootHandleMem = null;
       try{
         await idbDeleteHandle("mokuroRoot");
       }catch(e){}
@@ -1907,6 +1947,7 @@ body[data-theme="light"] .tile-actions .star-btn:hover{ background: rgba(255,255
 
     async function getLinkedMokuroFolder(){
       try{
+        if (_mokuroRootHandleMem) return _mokuroRootHandleMem;
         const rec = await idbGetHandle("mokuroRoot");
         if (!rec || !rec.handle) return null;
         const ok = await ensureHandlePermission(rec.handle);
@@ -2227,10 +2268,106 @@ for (const ln of Array.from(doc.querySelectorAll('link[rel]'))){
           st.textContent = css;
         }
 
+        // Register a resolver so the opened Mokuro tab can ask this page to resolve dynamically-loaded assets (e.g., cover00060.jpeg created at runtime)
+        const token = "mk_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        _mokuroResolvers.set(token, { getAssetObjectUrl, createdObjectUrls });
+
+        // Inject a small runtime patch that rewrites relative URLs at runtime (covers JS-created images, fetches, etc.)
+        try{
+          const s = doc.createElement("script");
+          s.textContent = `(function(){
+            const TOKEN = ${JSON.stringify(token)};
+            const pending = new Map();
+            let seq = 0;
+
+            function isRel(u){
+              if (!u) return false;
+              const s = String(u).trim();
+              if (!s) return false;
+              if (s.startsWith("#")) return false;
+              // absolute or protocol-relative
+              return !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(s);
+            }
+
+            function requestUrl(path){
+              if (!isRel(path)) return Promise.resolve(path);
+              return new Promise((resolve) => {
+                const reqId = "r" + (seq++);
+                const t = setTimeout(() => { pending.delete(reqId); resolve(path); }, 8000);
+                pending.set(reqId, (url) => { clearTimeout(t); resolve(url || path); });
+                const target = window.opener || window.parent;
+                if (!target){ pending.delete(reqId); clearTimeout(t); resolve(path); return; }
+                try{
+                  target.postMessage({ type:"mokuro-asset-req", token: TOKEN, reqId, path }, "*");
+                }catch(e){
+                  pending.delete(reqId); clearTimeout(t); resolve(path);
+                }
+              });
+            }
+
+            window.addEventListener("message", (ev) => {
+              const d = ev.data || {};
+              if (!d || d.type !== "mokuro-asset-resp") return;
+              if (d.token !== TOKEN) return;
+              const cb = pending.get(d.reqId);
+              if (cb){ pending.delete(d.reqId); cb(d.url); }
+            });
+
+            // Patch Image.src to resolve relative assets loaded dynamically
+            try{
+              const desc = Object.getOwnPropertyDescriptor(Image.prototype, "src");
+              if (desc && desc.set){
+                Object.defineProperty(Image.prototype, "src", {
+                  get: desc.get,
+                  set: function(v){
+                    const self = this;
+                    requestUrl(v).then(u => desc.set.call(self, u));
+                  }
+                });
+              }
+            }catch(e){}
+
+            // Patch fetch
+            try{
+              const origFetch = window.fetch;
+              window.fetch = function(resource, init){
+                if (typeof resource === "string" && isRel(resource)){
+                  return requestUrl(resource).then(u => origFetch.call(this, u, init));
+                }
+                if (resource && typeof resource.url === "string" && isRel(resource.url)){
+                  return requestUrl(resource.url).then(u => origFetch.call(this, u, init));
+                }
+                return origFetch.call(this, resource, init);
+              };
+            }catch(e){}
+
+            // Patch XHR open
+            try{
+              const origOpen = XMLHttpRequest.prototype.open;
+              XMLHttpRequest.prototype.open = function(method, url){
+                const args = arguments;
+                if (typeof url === "string" && isRel(url)){
+                  requestUrl(url).then(u => origOpen.apply(this, [method, u].concat([].slice.call(args,2))));
+                  return;
+                }
+                return origOpen.apply(this, args);
+              };
+            }catch(e){}
+
+            window.addEventListener("beforeunload", () => {
+              try{
+                const target = window.opener || window.parent;
+                target && target.postMessage({ type:"mokuro-asset-close", token: TOKEN }, "*");
+              }catch(e){}
+            });
+          })();`;
+          doc.body.appendChild(s);
+        }catch(e){}
+
         const finalHtml = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
         const docUrl = URL.createObjectURL(new Blob([finalHtml], {type:"text/html"}));
 
-        const w = window.open(docUrl, "_blank", "noopener,noreferrer");
+        const w = window.open(docUrl, "_blank");
         if (!w) location.href = docUrl;
 
         // Revoke document blob URL later; keep asset URLs until tab closes.
@@ -2264,7 +2401,19 @@ async function setCoverFromLinkedMokuro(imgEl, coverRelPath){
     if (!root) return;
     const ok = await ensureHandlePermission(root);
     if (!ok) return;
-    const fh = await getFileHandleByRelPath(root, rel);
+    let fh = await getFileHandleByRelPath(root, rel);
+    // Fallback: some Mokuro outputs place cover images beside the HTML, not inside the images folder.
+    if (!fh){
+      try{
+        // e.g. "Dragonhead/Dragonhead 01/cover00123.jpeg" -> try "Dragonhead/cover00123.jpeg"
+        const parts = normaliseSlashes(rel).split("/").filter(Boolean);
+        if (parts.length >= 3){
+          const fileName = parts[parts.length-1];
+          const alt = parts.slice(0, parts.length-2).concat([fileName]).join("/");
+          fh = await getFileHandleByRelPath(root, alt);
+        }
+      }catch(e){}
+    }
     if (!fh) return;
     const file = await fh.getFile();
     const url = URL.createObjectURL(file);
@@ -2828,7 +2977,7 @@ function seriesLineForItem(item){
 
       // If a Mokuro folder was previously linked, ensure library items prefer local folder versions when possible
       if (settings.ui && settings.ui.mokuroFolderLinked){
-        getLinkedMokuroFolder().then((h) => { if (h) refreshLibraryToUseLinkedMokuroFolder(h); }).catch(() => {});
+        getLinkedMokuroFolder().then((h) => { if (h){ _mokuroRootHandleMem = h; refreshLibraryToUseLinkedMokuroFolder(h); } }).catch(() => {});
       }
           route();
         });
@@ -4622,6 +4771,10 @@ if (localFileInput){
         const el = $("#mokuroFolderStatus");
         if (!el) return;
         const name = (settings.ui && settings.ui.mokuroFolderName) ? settings.ui.mokuroFolderName : "";
+        if (_mokuroRootHandleMem){
+          el.textContent = name ? `Linked: ${name} (this session)` : `Linked folder (this session)`;
+          return;
+        }
         const rec = await idbGetHandle("mokuroRoot").catch(()=>null);
         if (rec && rec.handle){
           const perm = await (async()=>{
