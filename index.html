@@ -2157,11 +2157,69 @@ async function openMokuroFromLinkedFolder(relPath){
           }).join("/");
         };
 
-        async function fileHandleToUrl(fileHandle){
+        async function rewriteCssUrls(cssText){
+          // Rewrite url(...) references to blob URLs backed by linked-folder files.
+          // Only touches relative urls (no http(s)/data/blob/#).
+          const re = /url\(\s*(['"]?)([^'")]+)\1\s*\)/gi;
+          let out = "";
+          let last = 0;
+          let m;
+          while ((m = re.exec(cssText)) !== null){
+            const full = m[0];
+            const q = m[1] || "";
+            const u0 = (m[2] || "").trim();
+            out += cssText.slice(last, m.index);
+            last = m.index + full.length;
+
+            if (!u0 || isExternalUrl(u0) || u0.startsWith("#")){
+              out += full;
+              continue;
+            }
+            const u = await getAssetObjectUrl(u0);
+            if (u){
+              out += `url(${q}${u}${q})`;
+            } else {
+              out += full;
+            }
+          }
+          out += cssText.slice(last);
+          return out;
+        }
+
+        async function fileHandleToUrlTransformed(fileHandle, decodedRel){
           const f = await fileHandle.getFile();
+          const name = String(decodedRel || f.name || "").toLowerCase();
+
+          // Rewrite Mokuro scripts to avoid touching window.localStorage on opaque origins.
+          if (name.endsWith(".js")){
+            try{
+              let js = await f.text();
+              js = js.replace(/\blocalStorage\b/g, "__SAFE_LS__");
+              const u = URL.createObjectURL(new Blob([js], {type:"text/javascript"}));
+              createdObjectUrls.add(u);
+              return u;
+            }catch(e){}
+          }
+
+          // Rewrite CSS url(...) references so covers/pages referenced from CSS load.
+          if (name.endsWith(".css")){
+            try{
+              let css = await f.text();
+              css = await rewriteCssUrls(css);
+              const u = URL.createObjectURL(new Blob([css], {type:"text/css"}));
+              createdObjectUrls.add(u);
+              return u;
+            }catch(e){}
+          }
+
           const u = URL.createObjectURL(f);
           createdObjectUrls.add(u);
           return u;
+        }
+
+        async function fileHandleToUrl(fileHandle){
+          // Backwards compatible default: no transform.
+          return fileHandleToUrlTransformed(fileHandle, "");
         }
 
         async function getAssetObjectUrl(relAssetPath){
@@ -2178,7 +2236,7 @@ async function openMokuroFromLinkedFolder(relPath){
               try{
                 const h = await getFileHandleByRelPath(assetsDirHandle, sub);
                 if (h){
-                  const u = await fileHandleToUrl(h);
+                  const u = await fileHandleToUrlTransformed(h, decoded);
                   assetUrlCache.set(decoded, u);
                   return u;
                 }
@@ -2190,7 +2248,7 @@ async function openMokuroFromLinkedFolder(relPath){
           try{
             const h2 = await getFileHandleByRelPath(dirHandle, decoded);
             if (h2){
-              const u2 = await fileHandleToUrl(h2);
+              const u2 = await fileHandleToUrlTransformed(h2, decoded);
               assetUrlCache.set(decoded, u2);
               return u2;
             }
@@ -2201,7 +2259,7 @@ async function openMokuroFromLinkedFolder(relPath){
             try{
               const h3 = await getFileHandleByRelPath(assetsDirHandle, decoded);
               if (h3){
-                const u3 = await fileHandleToUrl(h3);
+                const u3 = await fileHandleToUrlTransformed(h3, decoded);
                 assetUrlCache.set(decoded, u3);
                 return u3;
               }
@@ -2213,6 +2271,35 @@ async function openMokuroFromLinkedFolder(relPath){
 
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlText, "text/html");
+
+        // Safe localStorage shim: Mokuro sometimes uses localStorage; blob/file origins may block it.
+        // We avoid touching window.localStorage by rewriting scripts to use __SAFE_LS__ instead.
+        const shimScript = doc.createElement("script");
+        shimScript.textContent = `(function(){
+          const _m = new Map();
+          function k(x){ return String(x); }
+          window.__SAFE_LS__ = {
+            getItem(key){ key = k(key); return _m.has(key) ? _m.get(key) : null; },
+            setItem(key, value){ _m.set(k(key), String(value)); },
+            removeItem(key){ _m.delete(k(key)); },
+            clear(){ _m.clear(); },
+            key(i){ return Array.from(_m.keys())[i] || null; },
+            get length(){ return _m.size; }
+          };
+        })();`;
+        if (doc.head) doc.head.insertBefore(shimScript, doc.head.firstChild);
+
+        // Rewrite inline scripts to use __SAFE_LS__ (external .js handled in fileHandleToUrlTransformed)
+        try{
+          for (const sc of Array.from(doc.querySelectorAll("script"))){
+            if (sc === shimScript) continue;
+            if (sc.hasAttribute("src")) continue;
+            const t = sc.textContent || "";
+            if (!t || t.indexOf("localStorage") === -1) continue;
+            sc.textContent = t.replace(/\blocalStorage\b/g, "__SAFE_LS__");
+          }
+        }catch(e){}
+
 
         async function rewriteAttribute(selector, attr, isSrcset){
           const nodes = Array.from(doc.querySelectorAll(selector));
@@ -2947,6 +3034,7 @@ function wireActionsToggle(card){
 }
 
 
+
 function getSeriesTotal(seriesName){
   if (!seriesName) return 1;
   try{
@@ -2958,11 +3046,90 @@ function getSeriesTotal(seriesName){
   }
 }
 
+/**
+ * Try to infer a series volume number when the user hasn't manually set one.
+ * Uses displayTitle/title, then falls back to path/url filenames.
+ */
+function inferSeriesNumber(item){
+  try{
+    if (item && typeof item.seriesNumber === "number" && Number.isFinite(item.seriesNumber) && item.seriesNumber > 0){
+      return item.seriesNumber;
+    }
+    const candidates = [];
+    if (item){
+      if (typeof item.displayTitle === "string") candidates.push(item.displayTitle);
+      if (typeof item.title === "string") candidates.push(item.title);
+      if (typeof item.path === "string") candidates.push(item.path);
+      if (typeof item.url === "string") candidates.push(item.url);
+      if (typeof item.mokuroRelPath === "string") candidates.push(item.mokuroRelPath);
+    }
+
+    // Look for a trailing volume-like number; prefer the LAST number in the string.
+    // Examples: "Dragonhead 01", "Berserk - 01", "One Piece 001", "Vol. 12"
+    const reLastNum = /(\d{1,4})(?!.*\d)/;
+    const reVolNum  = /(?:\bvol(?:ume)?\b\.?\s*)(\d{1,4})(?!.*\d)/i;
+
+    for (const raw of candidates){
+      const s = String(raw || "");
+      if (!s) continue;
+
+      // If filename includes extension, strip it for cleaner matching.
+      const s2 = s.replace(/[#?].*$/g, "").replace(/\.(html?|xhtml)$/i, "");
+
+      let mm = s2.match(reVolNum);
+      if (!mm) mm = s2.match(reLastNum);
+      if (mm && mm[1]){
+        const n = parseInt(mm[1], 10);
+        if (Number.isFinite(n) && n > 0) return n;
+      }
+    }
+    return null;
+  }catch(e){
+    return null;
+  }
+}
+
+function _seriesSortKey(b){
+  const n = inferSeriesNumber(b);
+  if (typeof n === "number" && Number.isFinite(n)) return { n, t: (b.displayTitle || b.title || b.url || b.path || "").toLowerCase() };
+  return { n: Number.POSITIVE_INFINITY, t: (b.displayTitle || b.title || b.url || b.path || "").toLowerCase() };
+}
+
+function inferSeriesIndex(item){
+  try{
+    const series = (item && typeof item.series === "string") ? item.series.trim() : "";
+    if (!series) return 1;
+    const list = Array.isArray(books) ? books.filter(b => b && b.series === series) : [];
+    if (!list.length) return 1;
+
+    const sorted = list.slice().sort((a,b) => {
+      const ka=_seriesSortKey(a), kb=_seriesSortKey(b);
+      if (ka.n !== kb.n) return ka.n - kb.n;
+      if (ka.t < kb.t) return -1;
+      if (ka.t > kb.t) return 1;
+      // final stable-ish tie breaker
+      const ida = a.id || a.key || a.path || a.url || "";
+      const idb = b.id || b.key || b.path || b.url || "";
+      return String(ida).localeCompare(String(idb));
+    });
+
+    const itemId = item.id || item.key || item.path || item.url || "";
+    const idx = sorted.findIndex(b => (b.id || b.key || b.path || b.url || "") === itemId);
+    if (idx >= 0) return idx + 1;
+
+    // Fallback: if we can't match, just use 1
+    return 1;
+  }catch(e){
+    return 1;
+  }
+}
+
 function seriesLineForItem(item){
   const series = (item && typeof item.series === "string") ? item.series.trim() : "";
   if (series){
     const total = getSeriesTotal(series);
-    const n = (typeof item.seriesNumber === "number" && Number.isFinite(item.seriesNumber)) ? item.seriesNumber : 1;
+    let n = inferSeriesNumber(item);
+    if (!n) n = inferSeriesIndex(item);
     return `Book ${n}/${total}`;
   }
   return "Book 1/1";
@@ -3458,7 +3625,7 @@ function createSeriesGroupCard(seriesName, seriesBooks, opts={}){
 
       // Prefer local covers for Mokuro volumes (avoids GitHub 404 spam), otherwise use the stored coverUrl.
       let didLocal = false;
-      const metaForPath = currentBook ? (getMeta(currentBookrrentBook.path) || {}) : {};
+      const metaForPath = currentBook ? (getMeta(currentBook.path) || {}) : {};
       const rel = currentBook ? (metaForPath.mokuroRelPath || currentBook.mokuroRelPath || extractMokuroRelPathFromUrl(currentBook.path, "") || "").trim() : "";
       if (rel){
         let coverName = currentBook.coverPage;
@@ -3480,22 +3647,6 @@ function createSeriesGroupCard(seriesName, seriesBooks, opts={}){
 
       setCoverBgFromImg(top, img);
       img.addEventListener("load", () => setCoverBgFromImg(top, img));
-
-      // If this is a Mokuro volume, try to load the cover from the linked folder (helps series stacks).
-      const metaForPath = currentBook ? (getMeta(currentBookrrentBook.path) || {}) : {};
-      const rel = currentBook ? (metaForPath.mokuroRelPath || currentBook.mokuroRelPath || extractMokuroRelPathFromUrl(currentBook.path, "") || "").trim() : "";
-      if (currentBook && rel){
-        let coverName = currentBook.coverPage;
-        if (!coverName){
-          const m = String(currentBook.coverUrl || "").match(/([^\/\?#]+\.(?:jpe?g|png|webp|gif))/i);
-          if (m) coverName = decodeURIComponent(m[1]);
-        }
-        if (coverName){
-          const coverRel = normaliseSlashes(rel.replace(/\.html$/i, "") + "/" + coverName);
-          // async; will update img.src when resolved
-          setCoverPreferLocal(img, coverRel, currentBook.coverUrl);
-        }
-      }
     } else {
       img.style.display = "none";
     }
